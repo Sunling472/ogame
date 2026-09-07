@@ -1,4 +1,4 @@
-package game
+package ogame
 
 import ecs "ecs"
 import rl "vendor:raylib"
@@ -59,20 +59,17 @@ run :: proc(g: ^Game, world: ^ecs.World) {
 
 	g.init(&g.ctx)
 
-	// Фаза setup: все пулы уже существуют -> строим query один раз, навсегда
 	for &s in g.update {s.query = ecs.query_new(world, s.types)}
 	for &s in g.render {s.query = ecs.query_new(world, s.types)}
 
 	for !rl.WindowShouldClose() {
 		delta := rl.GetFrameTime()
 
-		// ФАЗА 1: заимствование (update). Структура мира не меняется.
 		for &s in g.update {
 			ecs.query_reset(&s.query)
 			s.update(&g.ctx, &s.query, delta)
 		}
 
-		// ФАЗА 2: структурные мутации применяются, когда никто не держит указатели
 		ecs.cmds_flush(&cmds)
 
 		rl.BeginDrawing()
