@@ -42,11 +42,14 @@ query_refresh :: proc(q: ^Query) {
 	q.stale = false
 
 	min_n, min_i := max(int), -1
+	missing: bool
 
 	for i in 0 ..< q.n {
 		if q.pools[i] == nil {
 			if idx, ok := q.world.pool_for[q.tids[i]]; ok {
 				q.pools[i] = q.world.pools[idx]
+			} else {
+				missing = true
 			}
 		}
 
@@ -56,6 +59,7 @@ query_refresh :: proc(q: ^Query) {
 	}
 
 	q.target = min_i
+	q.stale = missing
 }
 
 query_reset :: proc(q: ^Query) {
@@ -65,6 +69,8 @@ query_reset :: proc(q: ^Query) {
 
 query_next :: proc(q: ^Query) -> bool {
 	if q.stale do query_refresh(q)
+	if q.stale do return false
+
 	if q.target < 0 do return false
 
 	p := q.pools[q.target]
