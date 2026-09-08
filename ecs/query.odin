@@ -13,6 +13,45 @@ Query :: struct {
 	stale:  bool,
 }
 
+// Именованный запрос системы: декларируется в reads дескриптора системы,
+// строится один раз в setup (после init, когда пулы уже существуют)
+// и кэшируется на весь run.
+Query_Def :: struct {
+	name:  string,
+	types: []typeid,
+}
+
+// Хранилище закешированных запросов. Живёт столько же, сколько run.
+Query_Table :: struct {
+	defs:   [dynamic]Query,
+	lookup: map[string]int,
+}
+
+query_table_build :: proc(defs: []Query_Def, world: ^World, allocator := context.allocator) -> (t: Query_Table) {
+	if len(defs) == 0 do return // пустая таблица: без аллокаций, ctx_query вернёт false
+
+	t.defs = make([dynamic]Query, allocator)
+	t.lookup = make(map[string]int, allocator)
+
+	for def, i in defs {
+		append(&t.defs, query_new(world, def.types))
+		t.lookup[def.name] = i
+	}
+
+	return
+}
+
+// Возвращает копию закешированного запроса. Копия по значению: система может
+// спокойно ресетить/итерировать её, не трогая эталон в таблице.
+query_table_get :: proc(t: ^Query_Table, name: string) -> Maybe(Query) {
+	if t == nil do return nil
+
+	i, found := t.lookup[name]
+	if !found do return nil
+
+	return t.defs[i]
+}
+
 query_new :: proc(w: ^World, tids: []typeid) -> (q: Query) {
 	q.world = w
 	min_n, min_i := max(int), -1
