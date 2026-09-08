@@ -100,7 +100,7 @@ query_next :: proc(q: ^Query) -> bool {
 	return false
 }
 
-query_get :: proc(q: ^Query, e: Entity, $T: typeid) -> ^T {
+query_get :: proc(q: ^Query, e: Entity, $T: typeid) -> Maybe(^T) {
 	for i in 0 ..< q.n {
 		if q.tids[i] != typeid_of(T) do continue
 
