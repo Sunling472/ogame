@@ -6,6 +6,9 @@ Commands :: struct {
 }
 
 cmds_destroy :: proc(c: ^Commands, e: Entity) {
+	for d in c.destroys {
+		if d == e do return
+	}
 	append(&c.destroys, e)
 }
 
