@@ -3,13 +3,18 @@ package ldtk
 import "core:encoding/json"
 
 /*
-Typed model of an LDtk project file (JSON export), based on the official schema:
-https://ldtk.io/files/JSON_SCHEMA.json
+Typed model of an LDtk project file (JSON export), anchored to the official
+schema version 1.5.3: https://ldtk.io/files/JSON_SCHEMA.json
 
-Only the fields relevant for loading and using levels are modeled; every other
-key present in the file is skipped by json.unmarshal (verified behavior).
+This is a forward-compatible "working subset": it models everything needed to
+load and use levels (project root, defs, levels, layer instances, entities
+and fields). Editor-only / round-trip data (auto-layer rules, intGrid value
+groups, realEditorValues, tileset cachedPixelData/customData, toc,
+customCommands, ...) is intentionally NOT modeled; json.unmarshal skips
+unknown keys, so such files still load losslessly for the modeled parts.
 
 JSON keys are matched EXACTLY against the `json:"..."` struct tags.
+See ldtk.odin for the loader, memory rules and semantics.
 */
 
 // ---------------------------------------------------------------------------
@@ -71,9 +76,9 @@ Project :: struct {
 
 // levels_all returns every level of the project: the root `levels` array plus
 // the levels of every world (multi-worlds export).
+// The returned slice is allocated and must be freed by the caller: delete(out).
 levels_all :: proc(p: ^Project, allocator := context.allocator) -> []Level {
 	out := make([dynamic]Level, allocator)
-	defer delete(out)
 	for l in p.levels do append(&out, l)
 	for w in p.worlds {
 		for l in w.levels do append(&out, l)
@@ -359,4 +364,14 @@ Tileset_Rect :: struct {
 	y:           int,
 	w:           int,
 	h:           int,
+}
+
+// Entity_Ref is the resolved form of an LDtk entity reference (field type
+// "EntityRef" / "Array<EntityRef>", e.g. a Button's `targets`). LDtk stores
+// refs as IIDs, see `field_entity_refs` in ldtk.odin.
+Entity_Ref :: struct {
+	entity_iid: string,
+	layer_iid:  string,
+	level_iid:  string,
+	world_iid:  string,
 }
