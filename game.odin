@@ -39,10 +39,23 @@ RenderSystem :: struct {
 	render: proc(_: ^Ctx, _: ^ecs.Query),
 }
 
+// CleanupSystem is the mirror of init: it runs once after the main loop
+// ends, while the window, audio and the ECS world are still alive, so the
+// game can release USER-owned data (unload textures/sounds, free strings or
+// slices stored inside components, save state...). Everything the framework
+// itself allocated (system query tables, deferred-destroy buffer) is freed
+// by run() after the cleanup systems; the World itself is owned by the
+// caller of run and must be freed with ecs.world_destroy afterwards.
+CleanupSystem :: struct {
+	name:    string,
+	cleanup: proc(_: ^Ctx),
+}
+
 Game :: struct {
 	ctx:      Ctx,
 	settings: Settings,
 	init:     proc(_: ^Ctx),
+	cleanup:  []CleanupSystem,
 	update:   []UpdateSystem,
 	render:   []RenderSystem,
 }
@@ -101,4 +114,27 @@ run :: proc(g: ^Game, world: ^ecs.World) {
 		free_all(context.temp_allocator)
 	}
 
+	// --- teardown ---
+	// 1. user cleanup: ECS world and raylib are still alive here, so systems
+	//    can read components and unload resources.
+	g.ctx.queries = nil
+	for &c in g.cleanup {
+		c.cleanup(&g.ctx)
+	}
+
+	// 2. framework cleanup: free what run() itself allocated (query tables
+	//    built before the loop, deferred-destroy buffer). Arena-safe, see
+	//    ecs.query_table_destroy / ecs.world_destroy.
+	for &s in g.update {
+		ecs.query_table_destroy(&s.read_q)
+		s.read_q = {}
+	}
+	for &s in g.render {
+		ecs.query_table_destroy(&s.read_q)
+		s.read_q = {}
+	}
+	delete(cmds.destroys)
+
+	// 3. the World belongs to the caller: free it with ecs.world_destroy()
+	//    after run() returns.
 }

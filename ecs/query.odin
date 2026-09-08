@@ -165,3 +165,14 @@ query_collect :: proc(q: ^Query, into: ^[dynamic]Entity) {
 		append(into, q.entity)
 	}
 }
+
+// query_table_destroy frees the containers allocated by query_table_build.
+// The Query structs themselves carry only pointers into the world and need
+// no cleanup. Like all ECS containers, [dynamic]/map remember their
+// allocator, so no allocator argument is needed (arena-safe).
+query_table_destroy :: proc(t: ^Query_Table) {
+	if t == nil do return
+	delete(t.defs)
+	delete(t.lookup)
+	t^ = {}
+}
