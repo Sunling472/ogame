@@ -11,7 +11,6 @@ Settings :: struct {
 	},
 }
 
-
 Ctx :: struct {
 	world:   ^ecs.World,
 	cmds:    ^ecs.Commands,
