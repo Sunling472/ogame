@@ -15,30 +15,28 @@ Settings :: struct {
 Ctx :: struct {
 	world:   ^ecs.World,
 	cmds:    ^ecs.Commands,
-	queries: ^ecs.Query_Table, // запросы ТЕКУЩЕЙ системы; валиден только внутри вызова update/render
+	queries: ^ecs.Query_Table,
 }
 
-// Доступ системы к именованному закешированному запросу: без построения
-// query на каждый тик, без глобалов. Запрос привязан к миру этого run.
 ctx_query :: proc(ctx: ^Ctx, name: string) -> Maybe(ecs.Query) {
 	return ecs.query_table_get(ctx.queries, name)
 }
 
 UpdateSystem :: struct {
 	name:   string,
-	types:  []typeid, // главный query: что система итерирует
-	reads:  []ecs.Query_Def, // доп. запросы: контекст системы (доступ через ctx_query)
-	query:  ecs.Query, // строится фреймворком в setup
-	read_q: ecs.Query_Table, // строится фреймворком в setup
+	types:  []typeid,
+	reads:  []ecs.Query_Def,
+	query:  ecs.Query,
+	read_q: ecs.Query_Table,
 	update: proc(_: ^Ctx, _: ^ecs.Query, _: f32),
 }
 
 RenderSystem :: struct {
 	name:   string,
-	types:  []typeid, // главный query: что система рисует
-	reads:  []ecs.Query_Def, // доп. запросы: контекст системы (доступ через ctx_query)
-	query:  ecs.Query, // строится фреймворком в setup
-	read_q: ecs.Query_Table, // строится фреймворком в setup
+	types:  []typeid,
+	reads:  []ecs.Query_Def,
+	query:  ecs.Query,
+	read_q: ecs.Query_Table,
 	render: proc(_: ^Ctx, _: ^ecs.Query),
 }
 
