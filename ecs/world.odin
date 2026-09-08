@@ -19,6 +19,43 @@ world_new :: proc(allocator := context.allocator) -> (w: World) {
 	return
 }
 
+/*
+world_destroy frees everything the ECS itself allocated: every pool's
+containers and pool object, plus the world's own lists/map. It needs no
+allocator argument and guesses nothing:
+
+- [dynamic] and map containers remember the allocator they were made with
+  (stored in their header), so plain delete() is always correct;
+- each Pool object keeps the allocator of the exact _pool_for call that
+  allocated it, so free(p, p.allocator) is always correct too.
+
+User-owned data (e.g. strings/slices inside component values) is NOT freed:
+components are copied by value into the pool and the world cannot know about
+their internals. Free such data yourself before calling world_destroy (e.g.
+in a game CleanupSystem).
+
+Allocator-agnostic by design: on a heap-like allocator this releases memory;
+on an arena every delete/free is a no-op and the arena itself is freed with
+arena_free_all. The world is zeroed afterwards, so a second world_destroy is
+a harmless no-op.
+*/
+world_destroy :: proc(w: ^World) {
+	if w == nil do return
+
+	for p in w.pools {
+		delete(p.entities) // containers remember their allocator
+		delete(p.data)
+		delete(p.sparse)
+		free(p, p.allocator) // the pool object itself
+	}
+
+	delete(w.pools)
+	delete(w.free)
+	delete(w.pool_for)
+
+	w^ = {}
+}
+
 @(private)
 _pool_for :: proc(w: ^World, $T: typeid, allocator := context.allocator) -> ^Pool {
 	tid := typeid_of(T)
@@ -29,6 +66,7 @@ _pool_for :: proc(w: ^World, $T: typeid, allocator := context.allocator) -> ^Poo
 
 	p.tid, p.align = tid, align_of(T)
 	p.stride = _stride_of(size_of(T), p.align)
+	p.allocator = allocator // this pool remembers the allocator of ITS creation
 
 	p.entities = make([dynamic]Entity, allocator)
 	if p.stride > 0 do p.data = make([dynamic]byte, allocator)

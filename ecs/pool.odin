@@ -7,6 +7,11 @@ Pool :: struct {
 	stride:   int,
 	align:    int,
 
+	// allocator used to create THIS pool (see _pool_for). Kept per object —
+	// not per world — so world_destroy frees each pool with the allocator of
+	// the exact call that allocated it, whatever that was.
+	allocator: mem.Allocator,
+
 	// dense
 	entities: [dynamic]Entity,
 	data:     [dynamic]byte,
