@@ -1,6 +1,5 @@
 package main
 
-import "core:log"
 import "../ecs"
 import g "../"
 import rl "vendor:raylib"
@@ -57,16 +56,14 @@ player_border_collision :: proc(ctx: ^g.Ctx, q: ^ecs.Query, delta: f32) {
 		speed := ecs.query_get(q, player, comp.Speed).?
 		vel   := ecs.query_get(q, player, comp.Vel).?
 
-		r1: rl.Rectangle = {0, 0, max_x, max_y}
-		r2: rl.Rectangle = {pos.x, pos.y, f32(size.x), f32(size.y)}
+		left   := pos.x
+		right  := pos.x + f32(size.x)
+		top    := pos.y
+		bottom := pos.y + f32(size.y)
 
-		collision := rl.GetCollisionRec(r1, r2)
-		log.info(collision)
-
-		if pos.x < min_x || pos.x > max_x ||
-		   pos.y < min_y || pos.y > max_y {
-			pos.x -= vel.x * delta
-			pos.y -= vel.y * delta
-		}
+		if left   < 0      do pos.x = 0
+		if top    < 0      do pos.y = 0
+		if right  > max_x  do pos.x = max_x - f32(size.x)
+		if bottom > max_y  do pos.y = max_y - f32(size.y)
 	}
 }
