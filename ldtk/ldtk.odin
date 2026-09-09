@@ -390,6 +390,84 @@ int_grid_cell :: proc(li: ^Layer_Instance, x, y: int) -> (value: int, ok: bool) 
 }
 
 // ---------------------------------------------------------------------------
+// World helpers (pure data, no engine dependencies)
+// ---------------------------------------------------------------------------
+
+// world_bounds returns the axis-aligned bounds of every level of the project
+// (root levels + multi-world levels) in px: useful for camera clamping and
+// viewport culling. ok == false when the project has no levels.
+world_bounds :: proc(p: ^Project) -> (min_x, min_y, max_x, max_y: int, ok: bool) {
+	_grow_world_bounds(p.levels, &min_x, &min_y, &max_x, &max_y, &ok)
+	for &w in p.worlds {
+		_grow_world_bounds(w.levels, &min_x, &min_y, &max_x, &max_y, &ok)
+	}
+	return
+}
+
+@(private)
+_grow_world_bounds :: proc(
+	levels: []Level,
+	min_x, min_y, max_x, max_y: ^int,
+	ok: ^bool,
+) {
+	for &l in levels {
+		x0, y0 := l.world_x, l.world_y
+		x1, y1 := x0 + l.px_wid, y0 + l.px_hei
+		if !ok^ {
+			min_x^, min_y^, max_x^, max_y^ = x0, y0, x1, y1
+			ok^ = true
+		} else {
+			min_x^ = min(min_x^, x0)
+			min_y^ = min(min_y^, y0)
+			max_x^ = max(max_x^, x1)
+			max_y^ = max(max_y^, y1)
+		}
+	}
+}
+
+// level_at_world_point returns the level whose rect contains the given
+// world-space point (px), or nil. Searches root and multi-world levels.
+level_at_world_point :: proc(p: ^Project, wx, wy: int) -> Maybe(^Level) {
+	for &l in p.levels {
+		if wx >= l.world_x && wx < l.world_x + l.px_wid &&
+		   wy >= l.world_y && wy < l.world_y + l.px_hei {
+			return &l
+		}
+	}
+	for &w in p.worlds {
+		for &l in w.levels {
+			if wx >= l.world_x && wx < l.world_x + l.px_wid &&
+			   wy >= l.world_y && wy < l.world_y + l.px_hei {
+				return &l
+			}
+		}
+	}
+	return nil
+}
+
+// entity_by_iid finds an entity instance by its project-wide iid, searching
+// every Entities layer of every level (root + worlds).
+entity_by_iid :: proc(p: ^Project, iid: string) -> Maybe(^Entity_Instance) {
+	if e := _entity_by_iid_in_levels(p.levels, iid); e != nil do return e
+	for &w in p.worlds {
+		if e := _entity_by_iid_in_levels(w.levels, iid); e != nil do return e
+	}
+	return nil
+}
+
+@(private)
+_entity_by_iid_in_levels :: proc(levels: []Level, iid: string) -> Maybe(^Entity_Instance) {
+	for &l in levels {
+		for &li in l.layer_instances {
+			for &e in li.entity_instances {
+				if e.iid == iid do return &e
+			}
+		}
+	}
+	return nil
+}
+
+// ---------------------------------------------------------------------------
 // Destruction
 // ---------------------------------------------------------------------------
 

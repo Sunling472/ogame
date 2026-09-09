@@ -98,6 +98,9 @@ import ldtk "../vendor/ldtk"   // из main.odin, лежащего рядом с
 | `entity_def_by_uid(project, uid)` | определение сущности |
 | `tileset_by_uid(project, uid)` | тайлсет |
 | `level_by_uid(project, uid)` / `level_by_identifier(project, name)` | уровень (root и миры) |
+| `world_bounds(project)` | границы всех уровней в px (камера/куллинг) |
+| `level_at_world_point(project, x, y)` | уровень, содержащий мировую точку |
+| `entity_by_iid(project, iid)` | энтити-инстанс по project-wide iid |
 | `layer_instance(level, name)` | слой-инстанс уровня |
 | `levels_all(project) -> []Level` | все уровни (root + миры), **вызывающий удаляет** |
 
