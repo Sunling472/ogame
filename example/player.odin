@@ -32,34 +32,38 @@ player_init :: proc(ctx: ^g.Ctx) {
 
 player_update :: proc(ctx: ^g.Ctx, q: ^ecs.Query, delta: f32) {
 	if player, ok := ecs.query_first(q).?; ok {
+		// Во время игровой фазы пулы не двигаются: структуру меняют только
+		// через cmds_* (применяется cmds_flush после update). Поэтому
+		// указатели на компоненты стабильны, и можно писать сразу.
 		pos    := ecs.query_get(q, player, comp.Pos).?
+		vel    := ecs.query_get(q, player, comp.Vel).?
 		speed  := ecs.query_get(q, player, comp.Speed).?
 		side   := ecs.query_get(q, player, comp.Side).?
-		weapon := ecs.query_get(q, player, comp.Weapon).?
 		sprint := ecs.query_get(q, player, comp.Sprint).?
-		vel    := ecs.query_get(q, player, comp.Vel).?
+		weapon := ecs.query_get(q, player, comp.Weapon).?
+
 		vel^ = comp.Vel{}
 
 		if rl.IsKeyDown(.LEFT_SHIFT)    do sprint^ = true
 		else if rl.IsKeyUp(.LEFT_SHIFT) do sprint^ = false
-		
+
 		if sprint^ do speed^ = 400
 		else do speed^ = 200
 
-		if rl.IsKeyDown(.W) { 
-			vel.y -= f32(speed^) 
+		if rl.IsKeyDown(.W) {
+			vel.y -= f32(speed^)
 			side^ = .Up
 		}
-		if rl.IsKeyDown(.S) { 
-			vel.y += f32(speed^) 
+		if rl.IsKeyDown(.S) {
+			vel.y += f32(speed^)
 			side^ = .Down
 		}
-		if rl.IsKeyDown(.A) { 
-			vel.x -= f32(speed^) 
+		if rl.IsKeyDown(.A) {
+			vel.x -= f32(speed^)
 			side^ = .Left
 		}
-		if rl.IsKeyDown(.D) { 
-			vel.x += f32(speed^) 
+		if rl.IsKeyDown(.D) {
+			vel.x += f32(speed^)
 			side^ = .Right
 		}
 
@@ -77,7 +81,7 @@ player_update :: proc(ctx: ^g.Ctx, q: ^ecs.Query, delta: f32) {
 				case .Down:  muzzle.y += 40
 				case .Up:    muzzle.y -= 10 // над игроком (высота пули 10)
 				}
-				bullet_spawn(ctx, muzzle, side^)
+				bullet_spawn(ctx, muzzle, side^) // структуру — через cmds внутри
 			}
 		}
 		pos.x += vel.x * delta

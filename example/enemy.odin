@@ -1,5 +1,6 @@
 package main
 
+import "core:math"
 import "core:math/rand"
 import "../ecs"
 import g "../"
@@ -10,12 +11,13 @@ move_enemy_acc:  f32
 move_enemy_time: f32 = 2
 
 enemy_spawn :: proc(ctx: ^g.Ctx, pos: [2]f32) {
-	enemy := ecs.entity_new(ctx.world)
-	ecs.add_component(ctx.world, enemy, comp.TEnemy{})
-	ecs.add_component(ctx.world, enemy, comp.Pos{pos.x, pos.y})
-	ecs.add_component(ctx.world, enemy, comp.Size{ 20, 40 })
-	ecs.add_component(ctx.world, enemy, comp.Speed{})
-	ecs.add_component(ctx.world, enemy, comp.Color(rl.GREEN))
+	// Игровая фаза: структуру — отложенно через cmds.
+	e := ecs.cmds_spawn(ctx.cmds)
+	ecs.cmds_add(ctx.cmds, e, comp.TEnemy{})
+	ecs.cmds_add(ctx.cmds, e, comp.Pos{pos.x, pos.y})
+	ecs.cmds_add(ctx.cmds, e, comp.Size{ 20, 40 })
+	ecs.cmds_add(ctx.cmds, e, comp.Speed(100))
+	ecs.cmds_add(ctx.cmds, e, comp.Color(rl.GREEN))
 }
 
 enemy_update :: proc(ctx: ^g.Ctx, q: ^ecs.Query, delta: f32) {
@@ -26,6 +28,28 @@ enemy_update :: proc(ctx: ^g.Ctx, q: ^ecs.Query, delta: f32) {
 	if _, ok := ecs.query_first(q).?; !ok {
 		enemy_spawn(ctx, [2]f32{enemy_x, enemy_y})
 	} 
+}
+
+enemy_move :: proc(ctx: ^g.Ctx, q: ^ecs.Query, delta: f32) {
+	pq := g.ctx_query(ctx, "player").?
+	if player, ok := ecs.query_first(&pq).?; ok {
+		player_pos := ecs.query_get(&pq, player, comp.Pos).?
+		for ecs.query_next(q) {
+			enemy := q.entity
+			pos   := ecs.query_get(q, enemy, comp.Pos).?
+			speed := ecs.query_get(q, enemy, comp.Speed).?
+			
+			enemy_direct: [2]f32
+			enemy_direct.x = player_pos.x - pos.x
+			enemy_direct.y = player_pos.y - pos.y
+
+			dist := math.sqrt_f32(enemy_direct.x * enemy_direct.x + enemy_direct.y * enemy_direct.y)
+			
+			step := f32(speed^) * delta
+			pos.x += (enemy_direct.x / dist) * step
+			pos.y += (enemy_direct.y / dist) * step
+		}
+	}
 }
 
 enemy_render :: proc(ctx: ^g.Ctx, q: ^ecs.Query) {

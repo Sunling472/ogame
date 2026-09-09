@@ -112,6 +112,18 @@ main :: proc() {
 				comp.Color
 			},
 			update = enemy_update
+		},
+		{
+			name = "enemy_move",
+			types = {
+				comp.TEnemy,
+				comp.Pos,
+				comp.Speed,
+			},
+			reads = {
+				{ name = "player", types = {comp.TPlayer, comp.Pos, comp.Vel} }
+			},
+			update = enemy_move
 		}
 	}
 
@@ -147,7 +159,7 @@ main :: proc() {
 			render = enemy_render
 		},
 		{
-			name = "ui",
+			name = "ui-debug",
 			types = {},
 			reads = {
 				{
@@ -162,7 +174,7 @@ main :: proc() {
 					},
 				},
 			},
-			render = ui_render
+			render = ui_debug_render
 		}
 	}
 

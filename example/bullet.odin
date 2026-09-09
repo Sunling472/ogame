@@ -6,13 +6,15 @@ import g    "../"
 import comp "components"
 
 bullet_spawn :: proc(ctx: ^g.Ctx, pos: [2]f32, side: comp.Side) {
-	bullet := ecs.entity_new(ctx.world)
-	ecs.add_component(ctx.world, bullet, comp.TBullet{})
-	ecs.add_component(ctx.world, bullet, comp.Pos(pos))
-	ecs.add_component(ctx.world, bullet, comp.Size{10, 5})
-	ecs.add_component(ctx.world, bullet, comp.Speed(400))
-	ecs.add_component(ctx.world, bullet, comp.Color(rl.WHITE))
-	ecs.add_component(ctx.world, bullet, comp.Side(side))
+	// Игровая фаза: структуру мира меняем отложенно через cmds —
+	// сущность «родится» на cmds_flush (граница update/render).
+	b := ecs.cmds_spawn(ctx.cmds)
+	ecs.cmds_add(ctx.cmds, b, comp.TBullet{})
+	ecs.cmds_add(ctx.cmds, b, comp.Pos(pos))
+	ecs.cmds_add(ctx.cmds, b, comp.Size{10, 5})
+	ecs.cmds_add(ctx.cmds, b, comp.Speed(400))
+	ecs.cmds_add(ctx.cmds, b, comp.Color(rl.WHITE))
+	ecs.cmds_add(ctx.cmds, b, comp.Side(side))
 }
 
 bullet_move :: proc(ctx: ^g.Ctx, q: ^ecs.Query, delta: f32) {
