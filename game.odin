@@ -11,32 +11,33 @@ Settings :: struct {
 	},
 }
 
-Ctx :: struct {
+Ctx :: struct ($Data: typeid) {
+	data:    Data,
 	world:   ^ecs.World,
 	cmds:    ^ecs.Commands,
 	queries: ^ecs.Query_Table,
 }
 
-ctx_query :: proc(ctx: ^Ctx, name: string) -> Maybe(ecs.Query) {
+ctx_query :: proc(ctx: ^Ctx($Data), name: string) -> Maybe(ecs.Query) {
 	return ecs.query_table_get(ctx.queries, name)
 }
 
-UpdateSystem :: struct {
+UpdateSystem :: struct ($Data: typeid) {
 	name:   string,
 	types:  []typeid,
 	reads:  []ecs.Query_Def,
 	query:  ecs.Query,
 	read_q: ecs.Query_Table,
-	update: proc(_: ^Ctx, _: ^ecs.Query, _: f32),
+	update: proc(_: ^Ctx(Data), _: ^ecs.Query, _: f32),
 }
 
-RenderSystem :: struct {
+RenderSystem :: struct ($Data: typeid) {
 	name:   string,
 	types:  []typeid,
 	reads:  []ecs.Query_Def,
 	query:  ecs.Query,
 	read_q: ecs.Query_Table,
-	render: proc(_: ^Ctx, _: ^ecs.Query),
+	render: proc(_: ^Ctx(Data), _: ^ecs.Query),
 }
 
 // CleanupSystem is the mirror of init: it runs once after the main loop
@@ -46,21 +47,21 @@ RenderSystem :: struct {
 // itself allocated (system query tables, deferred-destroy buffer) is freed
 // by run() after the cleanup systems; the World itself is owned by the
 // caller of run and must be freed with ecs.world_destroy afterwards.
-CleanupSystem :: struct {
+CleanupSystem :: struct ($Data: typeid) {
 	name:    string,
-	cleanup: proc(_: ^Ctx),
+	cleanup: proc(_: ^Ctx(Data)),
 }
 
-Game :: struct {
-	ctx:      Ctx,
+Game :: struct ($Data: typeid) {
+	ctx:      Ctx(Data),
 	settings: Settings,
-	init:     proc(_: ^Ctx),
-	cleanup:  []CleanupSystem,
-	update:   []UpdateSystem,
-	render:   []RenderSystem,
+	init:     proc(_: ^Ctx(Data)),
+	cleanup:  []CleanupSystem(Data),
+	update:   []UpdateSystem(Data),
+	render:   []RenderSystem(Data),
 }
 
-run :: proc(g: ^Game, world: ^ecs.World) {
+run :: proc(g: ^Game($Data), world: ^ecs.World) {
 	assert(g.init != nil)
 
 	cmds: ecs.Commands
