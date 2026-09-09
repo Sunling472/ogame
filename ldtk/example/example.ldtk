@@ -26,7 +26,7 @@
 			"levelIid": "d53f9950-c640-11ed-8430-4942c04951ff",
 			"layerIid": "d53f9951-c640-11ed-8430-3f3f71a3daf1",
 			"entityIid": "9faf4260-c640-11ed-8430-2b1c51694f4d"
-		}, "worldX": 424, "worldY": 168, "widPx": 16, "heiPx": 16, "fields" : {} }]
+		}, "worldX": 440, "worldY": 72, "widPx": 16, "heiPx": 16, "fields" : {} }]
 	}],
 	"worldLayout": "GridVania",
 	"worldGridWidth": 256,
@@ -1433,7 +1433,7 @@
 						},
 						{
 							"__identifier": "Player",
-							"__grid": [10,10],
+							"__grid": [11,4],
 							"__pivot": [0.5,0.5],
 							"__tags": ["actor"],
 							"__tile": { "tilesetUid": 104, "x": 0, "y": 240, "w": 16, "h": 16 },
@@ -1442,13 +1442,13 @@
 							"width": 16,
 							"height": 16,
 							"defUid": 59,
-							"px": [168,168],
+							"px": [184,72],
 							"fieldInstances": [
 								{ "__identifier": "life", "__type": "Int", "__value": 100, "__tile": null, "defUid": 61, "realEditorValues": [] },
 								{ "__identifier": "ammo", "__type": "Int", "__value": 10, "__tile": null, "defUid": 60, "realEditorValues": [] }
 							],
-							"__worldX": 424,
-							"__worldY": 168
+							"__worldX": 440,
+							"__worldY": 72
 						},
 						{
 							"__identifier": "Door",
@@ -1519,15 +1519,23 @@
 							"height": 10,
 							"defUid": 105,
 							"px": [184,40],
-							"fieldInstances": [{ "__identifier": "targets", "__type": "Array<EntityRef>", "__value": [{
+							"fieldInstances": [{ "__identifier": "targets", "__type": "Array<EntityRef>", "__value": [ {
 								"entityIid": "8d4360c0-c640-11ed-8430-abb21cbec6c0",
 								"layerIid": "d53f9951-c640-11ed-8430-3f3f71a3daf1",
 								"levelIid": "d53f9950-c640-11ed-8430-4942c04951ff",
 								"worldIid": "c9ef2d10-c640-11ed-ad34-f553e1d803f9"
-							}], "__tile": null, "defUid": 106, "realEditorValues": [{
+							}, {
+								"entityIid": "8ac5dda0-c640-11ed-8430-8169bab5952b",
+								"layerIid": "d53f9951-c640-11ed-8430-3f3f71a3daf1",
+								"levelIid": "d53f9950-c640-11ed-8430-4942c04951ff",
+								"worldIid": "c9ef2d10-c640-11ed-ad34-f553e1d803f9"
+							} ], "__tile": null, "defUid": 106, "realEditorValues": [ {
 								"id": "V_String",
 								"params": ["8d4360c0-c640-11ed-8430-abb21cbec6c0"]
-							}] }],
+							}, {
+								"id": "V_String",
+								"params": ["8ac5dda0-c640-11ed-8430-8169bab5952b"]
+							} ] }],
 							"__worldX": 440,
 							"__worldY": 40
 						},
