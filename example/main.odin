@@ -45,12 +45,7 @@ main :: proc() {
 	}
 
 	game.init = init
-	game.cleanup = {
-		{
-			name    = "game_cleanup",
-			cleanup = cleanup_system,
-		},
-	}
+	game.cleanup = cleanup_system
 	game.update = {
 		{
 			name = "input",

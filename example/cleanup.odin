@@ -5,14 +5,14 @@ import g "../"
 import rl "vendor:raylib"
 
 /*
-Кто чем владеет — и зачем вообще CleanupSystem.
+Кто чем владеет — и зачем вообще cleanup-процедура.
 
 1. Мир (ECS)              → ecs.world_destroy(&world) в main, после run
 2. Внутренности run()     → query-таблицы и cmds: run освобождает сам
 3. context.allocator      → heap: живёт до выхода из main
    temp_allocator (арена) → сбрасывается run() каждый кадр
 
-Всё это освободится БЕЗ CleanupSystem. CleanupSystem чистит то, чем владеет
+Всё это освободится БЕЗ cleanup-процедуры. cleanup чистит то, чем владеет
 САМА ИГРА, — ресурсы, которых не видят ни мир, ни аллокаторы:
 
   a) ресурсы raylib/ОС: текстуры, шрифты, звуки, музыка — память GPU/аудио

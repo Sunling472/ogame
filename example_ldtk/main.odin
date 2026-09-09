@@ -44,9 +44,7 @@ main :: proc() {
 	}
 
 	game.init = scene_init
-	game.cleanup = {
-		{name = "cleanup", cleanup = cleanup_system},
-	}
+	game.cleanup = cleanup_system
 	game.update = {
 		{
 			name   = "interact",

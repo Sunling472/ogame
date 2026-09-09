@@ -47,23 +47,18 @@ RenderSystem :: struct ($Data: typeid) {
 	render: proc(_: ^Ctx(Data)),
 }
 
-// CleanupSystem is the mirror of init: it runs once after the main loop
-// ends, while the window, audio and the ECS world are still alive, so the
-// game can release USER-owned data (unload textures/sounds, free strings or
-// slices stored inside components, save state...). Everything the framework
-// itself allocated (system query tables, deferred-destroy buffer) is freed
-// by run() after the cleanup systems; the World itself is owned by the
-// caller of run and must be freed with ecs.world_destroy afterwards.
-CleanupSystem :: struct ($Data: typeid) {
-	name:    string,
-	cleanup: proc(_: ^Ctx(Data)),
-}
-
+// cleanup is the mirror of init: a single proc that runs once after the
+// main loop ends, while the window, audio and the ECS world are still alive,
+// so the game can release USER-owned data (unload textures/sounds, free
+// strings or slices stored inside components, save state...). Everything the
+// framework itself allocated (system query tables, deferred-destroy buffer)
+// is freed by run() after cleanup; the World itself is owned by the caller
+// of run and must be freed with ecs.world_destroy afterwards.
 Game :: struct ($Data: typeid) {
 	ctx:      Ctx(Data),
 	settings: Settings,
 	init:     proc(_: ^Ctx(Data)),
-	cleanup:  []CleanupSystem(Data),
+	cleanup:  proc(_: ^Ctx(Data)), // nil, если не нужен
 	update:   []UpdateSystem(Data),
 	render:   []RenderSystem(Data),
 }
@@ -134,11 +129,12 @@ run :: proc(g: ^Game($Data), world: ^ecs.World) {
 	}
 
 	// --- teardown ---
-	// 1. user cleanup: ECS world and raylib are still alive here, so systems
-	//    can read components and unload resources.
+	// 1. user cleanup: ECS world and raylib are still alive here, so the game
+	//    can read components and unload resources (mirror of init).
+	g.ctx.query = nil
 	g.ctx.queries = nil
-	for &c in g.cleanup {
-		c.cleanup(&g.ctx)
+	if g.cleanup != nil {
+		g.cleanup(&g.ctx)
 	}
 
 	// 2. framework cleanup: free what run() itself allocated (query tables

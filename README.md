@@ -249,4 +249,4 @@ game.settings.window = {
 | `collision.odin`             | вложенный запрос (`query_reset`/`query_next`), отложенное уничтожение                        |
 | `ui.odin`                    | `reads` + `ctx_query` (кешированный запрос игрока)                                           |
 | `background.odin`            | `types = {}` рендер-система                                                                  |
-| `cleanup.odin`               | `CleanupSystem`: что выполняется после цикла                                                 |
+| `cleanup.odin`               | cleanup-процедура: зеркало init, выполняется после цикла                                      |
