@@ -9,6 +9,13 @@ World :: struct {
 	free:     [dynamic]Entity,
 	pools:    [dynamic]^Pool,
 	pool_for: map[typeid]int,
+
+	// locked: run() ставит true на время игровой фазы (update/render).
+	// В это время прямые структурные мутации (add_component/remove_component/
+	// destroy_entity) запрещены — структуру меняют только через cmds_*,
+	// а применяет её cmds_flush на границе фаз. Так пулы не двигаются,
+	// пока системы держат указатели на компоненты.
+	locked: bool,
 }
 
 world_new :: proc(allocator := context.allocator) -> (w: World) {
@@ -58,14 +65,20 @@ world_destroy :: proc(w: ^World) {
 
 @(private)
 _pool_for :: proc(w: ^World, $T: typeid, allocator := context.allocator) -> ^Pool {
-	tid := typeid_of(T)
+	return _pool_for_id(w, typeid_of(T), size_of(T), align_of(T), allocator)
+}
+
+// runtime (type-erased) variant: used by cmds_flush, where component types
+// are known only as typeid/size/align values.
+@(private)
+_pool_for_id :: proc(w: ^World, tid: typeid, size, align: int, allocator: mem.Allocator) -> ^Pool {
 	if idx, ok := w.pool_for[tid]; ok do return w.pools[idx]
 
 	p, alloc_err := new(Pool, allocator)
 	if alloc_err != nil do panic("Pool allocation error")
 
-	p.tid, p.align = tid, align_of(T)
-	p.stride = _stride_of(size_of(T), p.align)
+	p.tid, p.align = tid, align
+	p.stride = _stride_of(size, p.align)
 	p.allocator = allocator // this pool remembers the allocator of ITS creation
 
 	p.entities = make([dynamic]Entity, allocator)
@@ -88,7 +101,16 @@ entity_new :: proc(w: ^World) -> Entity {
 	return e
 }
 
+STRUCTURAL_LOCKED_MSG :: "structural mutation during the game phase: pools must not move while systems hold component pointers. Use cmds_spawn/cmds_add/cmds_remove/cmds_destroy inside update/render; direct add_component/remove_component/destroy_entity is only allowed outside the locked phase (init/cleanup)."
+
 destroy_entity :: proc(w: ^World, e: Entity) {
+	assert(!w.locked, STRUCTURAL_LOCKED_MSG)
+	_destroy_entity_impl(w, e)
+}
+
+// unlocked impl used by cmds_flush at the phase boundary.
+@(private)
+_destroy_entity_impl :: proc(w: ^World, e: Entity) {
 	for p in w.pools {
 		if int(e) < len(p.sparse) {
 			_pool_remove(p, e)
@@ -97,14 +119,30 @@ destroy_entity :: proc(w: ^World, e: Entity) {
 	append(&w.free, e)
 }
 
+/*
+add_component stores (or overwrites) a component of type T on entity e.
+
+Phase rule: adding a component grows the pool's dense storage and can
+invalidate previously obtained ^T pointers, therefore during the game phase
+(world.locked, see run) only cmds_add may be used; the actual add is applied
+by cmds_flush at the phase boundary. Outside the locked phase (init/cleanup)
+direct use is fine.
+*/
 add_component :: proc(w: ^World, e: Entity, c: $T) {
-	p := _pool_for(w, T)
+	assert(!w.locked, STRUCTURAL_LOCKED_MSG)
+	c := c
+	_add_component_bytes(w, e, typeid_of(T), size_of(T), align_of(T), &c, context.allocator)
+}
+
+// runtime (type-erased) add: copy `size` bytes from `ptr` into the pool slot.
+@(private)
+_add_component_bytes :: proc(w: ^World, e: Entity, tid: typeid, size, align: int, ptr: rawptr, allocator: mem.Allocator) {
+	p := _pool_for_id(w, tid, size, align, allocator)
 	if !_pool_has(p, e) do _pool_add(p, e)
 
 	if p.stride > 0 {
 		di := p.sparse[int(e)]
-		c := c
-		mem.copy(&p.data[di * p.stride], &c, size_of(T))
+		mem.copy(&p.data[di * p.stride], ptr, size)
 	}
 }
 
@@ -121,8 +159,22 @@ get_component :: proc(w: ^World, e: Entity, $T: typeid) -> ^T {
 	return cast(^T)&p.data[di * p.stride]
 }
 
+/*
+remove_component removes the component of type T from entity e, if present.
+
+Phase rule (see add_component): removal uses swap-remove, which MOVES the
+dense slot of the last entity — during the game phase it must go through
+cmds_remove and is applied by cmds_flush at the phase boundary.
+*/
 remove_component :: proc(w: ^World, e: Entity, $T: typeid) {
-	if idx, ok := w.pool_for[typeid_of(T)]; ok {
+	assert(!w.locked, STRUCTURAL_LOCKED_MSG)
+	_remove_component_tid(w, e, typeid_of(T))
+}
+
+// runtime (type-erased) variant used by cmds_flush.
+@(private)
+_remove_component_tid :: proc(w: ^World, e: Entity, tid: typeid) {
+	if idx, ok := w.pool_for[tid]; ok {
 		_pool_remove(w.pools[idx], e)
 	}
 }

@@ -64,7 +64,7 @@ run :: proc(g: ^Game, world: ^ecs.World) {
 	assert(g.init != nil)
 
 	cmds: ecs.Commands
-	cmds.world = world
+	ecs.cmds_init(&cmds, world)
 
 	g.ctx.world = world
 	g.ctx.cmds = &cmds
@@ -93,6 +93,11 @@ run :: proc(g: ^Game, world: ^ecs.World) {
 	for !rl.WindowShouldClose() {
 		delta := rl.GetFrameTime()
 
+		// Игровая фаза: структуру мира меняем только через cmds_* —
+		// прямые add/remove/destroy упадут с понятной ошибкой. Пулы не
+		// двигаются, пока системы держат указатели на компоненты.
+		world.locked = true
+
 		for &s in g.update {
 			g.ctx.queries = &s.read_q // контекст = запросы текущей системы
 			ecs.query_reset(&s.query)
@@ -100,6 +105,7 @@ run :: proc(g: ^Game, world: ^ecs.World) {
 		}
 		g.ctx.queries = nil
 
+		// Граница фаз: применяем отложенную структуру (adds→removes→destroys).
 		ecs.cmds_flush(&cmds)
 
 		rl.BeginDrawing()
@@ -111,6 +117,7 @@ run :: proc(g: ^Game, world: ^ecs.World) {
 		g.ctx.queries = nil
 		rl.EndDrawing()
 
+		world.locked = false
 		free_all(context.temp_allocator)
 	}
 
@@ -133,7 +140,7 @@ run :: proc(g: ^Game, world: ^ecs.World) {
 		ecs.query_table_destroy(&s.read_q)
 		s.read_q = {}
 	}
-	delete(cmds.destroys)
+	ecs.cmds_free(&cmds)
 
 	// 3. the World belongs to the caller: free it with ecs.world_destroy()
 	//    after run() returns.
