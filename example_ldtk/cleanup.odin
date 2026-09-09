@@ -39,11 +39,18 @@ hud_render :: proc(ctx: ^g.Ctx, q: ^ecs.Query) {
 	if pq := g.ctx_query(ctx, "player"); pq != nil {
 		qv := pq.?
 		if player, ok := ecs.query_first(&qv).?; ok {
-			st := ecs.query_get(&qv, player, Player_State).?
+			st  := ecs.query_get(&qv, player, Player_State).?
 			pos := ecs.query_get(&qv, player, Pos).?
+			inv := ecs.query_get(&qv, player, Inventory).?
 
-			buf: [128]byte
-			text := fmt.bprintf(buf[:], "HP %d  AMMO %d  pos (%.0f, %.0f)", st.life, st.ammo, pos.x, pos.y)
+			key_a := inv.key_a ? "A" : "-"
+			key_b := inv.key_b ? "B" : "-"
+			buf: [256]byte
+			text := fmt.bprintf(
+				buf[:],
+				"HP %d   AMMO %d   KEYS [%s %s]   SCORE %d   pos (%.0f, %.0f)",
+				st.life, st.ammo, key_a, key_b, inv.score, pos.x, pos.y,
+			)
 			rl.DrawText(cstring(raw_data(text)), 10, 10, 20, rl.RAYWHITE)
 		}
 	}

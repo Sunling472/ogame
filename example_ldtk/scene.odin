@@ -50,6 +50,21 @@ hex_color :: proc(s: string) -> rl.Color {
 	return rl.Color{r, gg, b, 255}
 }
 
+// item_kind_from_string: тип предмета/замка по значению enum LDtk ("KeyA"…).
+item_kind_from_string :: proc(s: string) -> Item_Kind {
+	switch s {
+	case "Wood":   return .Wood
+	case "Metal":  return .Metal
+	case "Food":   return .Food
+	case "Health": return .Health
+	case "Rifle":  return .Rifle
+	case "KeyA":   return .KeyA
+	case "KeyB":   return .KeyB
+	case "Gold":   return .Gold
+	}
+	return .None
+}
+
 // top_left возвращает левый верхний угол прямоугольника по якорю (px), pivot и размеру.
 top_left :: proc(anchor: [2]f32, pivot: Pivot, size: Size) -> [2]f32 {
 	return {anchor.x - pivot.x * size.w, anchor.y - pivot.y * size.h}
@@ -217,15 +232,42 @@ _spawn_level_entities :: proc(ctx: ^g.Ctx) {
 					ecs.add_component(ctx.world, ent, Vel{})
 					ecs.add_component(ctx.world, ent, Player_State{life, ammo})
 					ecs.add_component(ctx.world, ent, Speed(130))
+					ecs.add_component(ctx.world, ent, Inventory{})
 					g_cam_follow = anchor // камера стартует на игроке
 					log.infof("игрок: life=%d ammo=%d", life, ammo)
 
 				case "Door":
-					ecs.add_component(ctx.world, ent, TDoor{})
-					ecs.add_component(ctx.world, ent, Door_State{open = false})
+					// замок двери — поле LDtk "lockedWith" (KeyA/KeyB/пусто)
+					lock: Item_Kind = .None
+					if l := ldtk.field_string(&ei, "lockedWith"); l != nil {
+						lock = item_kind_from_string(l.?)
+					}
+					ecs.add_component(ctx.world, ent, TSolid{})
+					ecs.add_component(ctx.world, ent, Door_State{open = false, lock = lock})
+					// Интерактивность (E) двери решаем ПОСЛЕ линковки кнопок:
+					//   - запертая: открывается ключом;
+					//   - без замка и БЕЗ кнопки в targets: обычная, открывается;
+					//   - без замка, но с кнопкой: только кнопкой (см. ниже).
+					log.infof("дверь: замок %v", lock)
+
+				case "SecretWall":
+					// секретная стена: «фальшивая» преграда на открытом полу;
+					// закрыта по умолчанию, открывается своей кнопкой (targets)
+					ecs.add_component(ctx.world, ent, TSolid{})
+					ecs.add_component(ctx.world, ent, Door_State{open = false, lock = .None})
+					log.info("секретная стена: закрыта, ждёт кнопку")
 
 				case "Button":
 					ecs.add_component(ctx.world, ent, TButton{})
+					ecs.add_component(ctx.world, ent, Interactable{range = 20})
+
+				case "Item":
+					// тип предмета — поле LDtk "type" (enum Item)
+					it: Item_Kind = .None
+					if l := ldtk.field_string(&ei, "type"); l != nil {
+						it = item_kind_from_string(l.?)
+					}
+					ecs.add_component(ctx.world, ent, it) // компонент-значение
 					ecs.add_component(ctx.world, ent, Interactable{range = 20})
 				}
 			}
@@ -233,6 +275,9 @@ _spawn_level_entities :: proc(ctx: ^g.Ctx) {
 	}
 
 	// pass 2: кнопки -> связанные двери (поле LDtk "targets", EntityRef-ы по iid)
+	door_by_button := make(map[ecs.Entity]bool) // двери, у которых есть кнопка
+	defer delete(door_by_button)
+
 	for &lv in g_levels {
 		for &li in lv.layer_instances {
 			if li.type != "Entities" do continue
@@ -251,6 +296,7 @@ _spawn_level_entities :: proc(ctx: ^g.Ctx) {
 				for r in refs {
 					if door, found := iid_map[r.entity_iid]; found {
 						append(&targets, door)
+						door_by_button[door] = true
 					} else {
 						log.warnf("кнопка ссылается на неизвестную сущность %s", r.entity_iid)
 					}
@@ -258,6 +304,17 @@ _spawn_level_entities :: proc(ctx: ^g.Ctx) {
 				ecs.add_component(ctx.world, button, Button_Link{targets})
 				log.infof("кнопка связана с %d дверьми", len(targets))
 			}
+		}
+	}
+
+	// Преграды, открываемые вручную (E): запертые (нужен ключ) ИЛИ «обычные»
+	// (без кнопки в targets). Кнопочные двери/стены — только кнопкой.
+	solid_q := ecs.query_new(ctx.world, {TSolid, Door_State})
+	for ecs.query_next(&solid_q) {
+		s := solid_q.entity
+		ds := ecs.query_get(&solid_q, s, Door_State).?
+		if ds.lock != .None || !(s in door_by_button) {
+			ecs.add_component(ctx.world, s, Interactable{range = 24})
 		}
 	}
 }
@@ -343,7 +400,7 @@ shade :: proc(c: rl.Color, f: f32) -> rl.Color {
 }
 
 // draw_actor_icon рисует «иконку» актора по категории.
-draw_actor_icon :: proc(tl: [2]f32, size: Size, kind: Actor_Kind, col: rl.Color, open: bool) {
+draw_actor_icon :: proc(tl: [2]f32, size: Size, kind: Actor_Kind, col: rl.Color, open, locked: bool) {
 	x0, y0 := tl.x, tl.y
 	x1, y1 := tl.x + size.w, tl.y + size.h
 	cx, cy := (x0 + x1) / 2, (y0 + y1) / 2
@@ -363,7 +420,13 @@ draw_actor_icon :: proc(tl: [2]f32, size: Size, kind: Actor_Kind, col: rl.Color,
 		rl.DrawRectangleLinesEx(rect, 2, panel)
 		rl.DrawRectangle(i32(x0 + size.w * 0.28), i32(y0 + 1), i32(size.w * 0.12), i32(size.h - 2), panel)
 		rl.DrawRectangle(i32(x0 + size.w * 0.60), i32(y0 + 1), i32(size.w * 0.12), i32(size.h - 2), panel)
-		rl.DrawCircle(i32(cx), i32(cy + size.h * 0.28), 2.5, {10, 10, 10, 255}) // ручка
+		if locked {
+			// замочная скважина
+			rl.DrawCircle(i32(cx), i32(cy + size.h * 0.28), 2.5, {10, 10, 10, 255})
+			rl.DrawCircle(i32(cx), i32(cy + size.h * 0.28), 1.2, {220, 200, 60, 255})
+		} else {
+			rl.DrawCircle(i32(cx), i32(cy + size.h * 0.28), 2.5, {10, 10, 10, 255}) // ручка
+		}
 
 	case .Button:
 		// плашка-кнопка: тёмная подложка + яркая крышка
@@ -380,7 +443,13 @@ draw_actor_icon :: proc(tl: [2]f32, size: Size, kind: Actor_Kind, col: rl.Color,
 		rl.DrawTriangleLines({cx, y0}, {x0 + 1, cy}, {cx, y1 - 1}, shade(col, 0.5))
 
 	case .Secret_Wall:
-		// кирпичная кладка
+		if open {
+			// секретная стена открыта кнопкой — проём виден
+			rl.DrawRectangleRec(rect, {col.r, col.g, col.b, 60})
+			rl.DrawRectangleLinesEx(rect, 1.5, shade(col, 0.6))
+			return
+		}
+		// закрытая: кирпичная кладка
 		rl.DrawRectangleRec(rect, col)
 		line := shade(col, 0.6)
 		y := y0 + 5
@@ -419,11 +488,13 @@ actors_render :: proc(ctx: ^g.Ctx, q: ^ecs.Query) {
 			kind = pk^
 		}
 		open := false
+		locked := false
 		if ds := ecs.get_component(ctx.world, e, Door_State); ds != nil {
 			open = ds.open
+			locked = ds.lock != .None
 		}
 
 		tl := top_left(cast([2]f32)anchor, pivot, size)
-		draw_actor_icon(tl, size, kind, col.c, open)
+		draw_actor_icon(tl, size, kind, col.c, open, locked)
 	}
 }

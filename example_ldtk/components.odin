@@ -31,13 +31,38 @@ Actor_Kind :: enum {
 	Secret_Wall,
 }
 
-// --- интерактив уровня: двери и кнопки ---
+// Тип предмета (enum LDtk "Item" из поля entity "type").
+Item_Kind :: enum {
+	None,
+	Wood,
+	Metal,
+	Food,
+	Health,
+	Rifle,
+	KeyA,
+	KeyB,
+	Gold,
+}
 
-TDoor :: struct{}
+// --- интерактив уровня: двери, кнопки, предметы ---
+
+// TSolid — открываемая преграда (дверь, секретная стена): пока закрыта,
+// блокирует движение; состояние открытости — в Door_State.
+TSolid :: struct{}
+
 TButton :: struct{}
 
 Door_State :: struct {
 	open: bool,
+	// чем заперта дверь (поле LDtk "lockedWith": KeyA/KeyB/None)
+	lock: Item_Kind,
+}
+
+// Инвентарь игрока: ключи и счёт (наполняется подбором предметов).
+Inventory :: struct {
+	key_a:  bool,
+	key_b:  bool,
+	score:  int,
 }
 
 // Button_Link — сущности-двери, которые открывает эта кнопка (из поля

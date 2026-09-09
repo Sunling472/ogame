@@ -37,7 +37,7 @@ main :: proc() {
 			name   = "player",
 			types  = {TPlayer, Pos, Vel, Speed},
 			reads  = {
-				{name = "doors", types = {TDoor, Door_State, Pos, Size, Pivot}},
+				{name = "doors", types = {TSolid, Door_State, Pos, Size, Pivot}},
 			},
 			update = player_update,
 		},
@@ -62,7 +62,7 @@ main :: proc() {
 			name   = "hud",
 			types  = {},
 			reads  = {
-				{name = "player", types = {TPlayer, Pos, Player_State}},
+				{name = "player", types = {TPlayer, Pos, Player_State, Inventory}},
 			},
 			render = hud_render,
 		},
