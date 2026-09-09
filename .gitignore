@@ -1,0 +1,5 @@
+# Odin Language Server — персональный конфиг (абсолютные пути)
+ols.json
+
+# Артефакты сборки Odin (default-выход odin run/build)
+*.bin
