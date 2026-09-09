@@ -6,8 +6,7 @@ import g    "../"
 import comp "components"
 
 bullet_spawn :: proc(ctx: ^g.Ctx, pos: [2]f32, side: comp.Side) {
-	// Игровая фаза: структуру мира меняем отложенно через cmds —
-	// сущность «родится» на cmds_flush (граница update/render).
+	// Игровая фаза: структуру мира меняем отложенно через cmds
 	b := ecs.cmds_spawn(ctx.cmds)
 	ecs.cmds_add(ctx.cmds, b, comp.TBullet{})
 	ecs.cmds_add(ctx.cmds, b, comp.Pos(pos))
