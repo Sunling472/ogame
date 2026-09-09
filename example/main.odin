@@ -6,7 +6,9 @@ import vmem "core:mem/virtual"
 import g "../"
 import ecs "../ecs"
 
-init :: proc(ctx: ^g.Ctx) {
+Data :: struct {}
+
+init :: proc(ctx: ^g.Ctx(Data)) {
 	player_init(ctx)
 	resources_init(ctx) // грузим ресурсы игры — их же освободит cleanup
 }
@@ -31,7 +33,7 @@ main :: proc() {
 	world := ecs.world_new(context.allocator)
 	defer ecs.world_destroy(&world) // мир на heap — освобождаем после run
 
-	game: g.Game
+	game: g.Game(Data)
 	game.settings = {
 		window = {
 			size = {1280, 720},

@@ -32,7 +32,7 @@ import rl "vendor:raylib"
 player_tex: rl.Texture2D
 
 // resources_init — зеркало cleanup: игра грузит свои ресурсы в init.
-resources_init :: proc(ctx: ^g.Ctx) {
+resources_init :: proc(ctx: ^g.Ctx(Data)) {
 	img := rl.GenImageColor(8, 8, rl.WHITE) // белый квадрат 8x8, без файла
 	defer rl.UnloadImage(img)               // CPU-копия больше не нужна
 	player_tex = rl.LoadTextureFromImage(img)
@@ -41,7 +41,7 @@ resources_init :: proc(ctx: ^g.Ctx) {
 
 // cleanup_system выполняется после главного цикла (в конце run), но ДО
 // defers run (CloseWindow/CloseAudioDevice) и ДО world_destroy в main.
-cleanup_system :: proc(ctx: ^g.Ctx) {
+cleanup_system :: proc(ctx: ^g.Ctx(Data)) {
 	// (a) raylib: выгружаем GPU-ресурс, пока окно живо. Этого не сделают
 	//     ни arena_destroy, ни world_destroy, ни teardown run.
 	if rl.IsTextureReady(player_tex) {

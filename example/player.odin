@@ -6,7 +6,7 @@ import ecs "../ecs"
 import rl "vendor:raylib"
 
 is_sprint: bool
-player_init :: proc(ctx: ^g.Ctx) {
+player_init :: proc(ctx: ^g.Ctx(Data)) {
 	player := ecs.entity_new(ctx.world)
 	ecs.add_component(ctx.world, player, comp.TPlayer{})
 	ecs.add_component(ctx.world, player, comp.Pos{10, 10})
@@ -30,7 +30,7 @@ player_init :: proc(ctx: ^g.Ctx) {
 	)
 }
 
-player_update :: proc(ctx: ^g.Ctx, q: ^ecs.Query, delta: f32) {
+player_update :: proc(ctx: ^g.Ctx(Data), q: ^ecs.Query, delta: f32) {
 	if player, ok := ecs.query_first(q).?; ok {
 		// Во время игровой фазы пулы не двигаются: структуру меняют только
 		// через cmds_* (применяется cmds_flush после update). Поэтому
@@ -91,7 +91,7 @@ player_update :: proc(ctx: ^g.Ctx, q: ^ecs.Query, delta: f32) {
 
 }
 
-player_render :: proc(ctx: ^g.Ctx, q: ^ecs.Query) {
+player_render :: proc(ctx: ^g.Ctx(Data), q: ^ecs.Query) {
 	player := ecs.query_first(q).?
 	pos := ecs.query_get(q, player, comp.Pos).?
 	size := ecs.query_get(q, player, comp.Size).?

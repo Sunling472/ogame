@@ -6,7 +6,7 @@ import rl "vendor:raylib"
 import comp "components"
 
 
-bullet_collision :: proc(ctx: ^g.Ctx, q: ^ecs.Query, delta: f32) {
+bullet_collision :: proc(ctx: ^g.Ctx(Data), q: ^ecs.Query, delta: f32) {
 	eq, ok := g.ctx_query(ctx, "enemies").?
 	if !ok do return
 
@@ -44,7 +44,7 @@ bullet_collision :: proc(ctx: ^g.Ctx, q: ^ecs.Query, delta: f32) {
 	}
 }
 
-player_border_collision :: proc(ctx: ^g.Ctx, q: ^ecs.Query, delta: f32) {
+player_border_collision :: proc(ctx: ^g.Ctx(Data), q: ^ecs.Query, delta: f32) {
 	min_x: f32 = 0
 	min_y: f32 = 0
 	max_x: f32 = f32(rl.GetScreenWidth())

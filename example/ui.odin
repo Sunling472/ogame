@@ -8,7 +8,7 @@ import comp "components"
 
 show_ui: bool
 
-ui_debug_render :: proc(ctx: ^g.Ctx, q: ^ecs.Query) {
+ui_debug_render :: proc(ctx: ^g.Ctx(Data), q: ^ecs.Query) {
 	if !show_ui do return
 
 	// закешированный фреймворком запрос — без построения на каждый тик

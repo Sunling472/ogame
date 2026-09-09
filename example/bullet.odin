@@ -5,7 +5,7 @@ import ecs  "../ecs"
 import g    "../"
 import comp "components"
 
-bullet_spawn :: proc(ctx: ^g.Ctx, pos: [2]f32, side: comp.Side) {
+bullet_spawn :: proc(ctx: ^g.Ctx(Data), pos: [2]f32, side: comp.Side) {
 	// Игровая фаза: структуру мира меняем отложенно через cmds
 	b := ecs.cmds_spawn(ctx.cmds)
 	ecs.cmds_add(ctx.cmds, b, comp.TBullet{})
@@ -16,7 +16,7 @@ bullet_spawn :: proc(ctx: ^g.Ctx, pos: [2]f32, side: comp.Side) {
 	ecs.cmds_add(ctx.cmds, b, comp.Side(side))
 }
 
-bullet_move :: proc(ctx: ^g.Ctx, q: ^ecs.Query, delta: f32) {
+bullet_move :: proc(ctx: ^g.Ctx(Data), q: ^ecs.Query, delta: f32) {
 	max_x := rl.GetScreenWidth()
 	max_y := rl.GetScreenHeight()
 	min_x := 0
@@ -52,7 +52,7 @@ bullet_move :: proc(ctx: ^g.Ctx, q: ^ecs.Query, delta: f32) {
 	}
 }
 
-bullet_render :: proc(ctx: ^g.Ctx, q: ^ecs.Query) {
+bullet_render :: proc(ctx: ^g.Ctx(Data), q: ^ecs.Query) {
 	for ecs.query_next(q) {
 		e := q.entity
 		p := ecs.query_get(q, e, comp.Pos).?

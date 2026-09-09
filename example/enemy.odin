@@ -10,7 +10,7 @@ import comp "components"
 move_enemy_acc:  f32
 move_enemy_time: f32 = 2
 
-enemy_spawn :: proc(ctx: ^g.Ctx, pos: [2]f32) {
+enemy_spawn :: proc(ctx: ^g.Ctx(Data), pos: [2]f32) {
 	// Игровая фаза: структуру — отложенно через cmds.
 	e := ecs.cmds_spawn(ctx.cmds)
 	ecs.cmds_add(ctx.cmds, e, comp.TEnemy{})
@@ -20,7 +20,7 @@ enemy_spawn :: proc(ctx: ^g.Ctx, pos: [2]f32) {
 	ecs.cmds_add(ctx.cmds, e, comp.Color(rl.GREEN))
 }
 
-enemy_update :: proc(ctx: ^g.Ctx, q: ^ecs.Query, delta: f32) {
+enemy_update :: proc(ctx: ^g.Ctx(Data), q: ^ecs.Query, delta: f32) {
 	enemy_x: f32 = rand.float32_range(10, f32(rl.GetScreenWidth())  - 30)
 	enemy_y: f32 = rand.float32_range(10, f32(rl.GetScreenHeight()) - 30)
 
@@ -30,7 +30,7 @@ enemy_update :: proc(ctx: ^g.Ctx, q: ^ecs.Query, delta: f32) {
 	} 
 }
 
-enemy_move :: proc(ctx: ^g.Ctx, q: ^ecs.Query, delta: f32) {
+enemy_move :: proc(ctx: ^g.Ctx(Data), q: ^ecs.Query, delta: f32) {
 	pq := g.ctx_query(ctx, "player").?
 	if player, ok := ecs.query_first(&pq).?; ok {
 		player_pos := ecs.query_get(&pq, player, comp.Pos).?
@@ -52,7 +52,7 @@ enemy_move :: proc(ctx: ^g.Ctx, q: ^ecs.Query, delta: f32) {
 	}
 }
 
-enemy_render :: proc(ctx: ^g.Ctx, q: ^ecs.Query) {
+enemy_render :: proc(ctx: ^g.Ctx(Data), q: ^ecs.Query) {
 	if enemy, ok := ecs.query_first(q).?; ok {
 		pos   := ecs.query_get(q, enemy, comp.Pos).?
 		size  := ecs.query_get(q, enemy, comp.Size).?
