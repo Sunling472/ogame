@@ -12,13 +12,20 @@ Settings :: struct {
 }
 
 Ctx :: struct ($Data: typeid) {
-	data:    Data,
+	data:    Data,               // состояние игры (что угодно: уровень, камера, ...)
 	world:   ^ecs.World,
 	cmds:    ^ecs.Commands,
-	queries: ^ecs.Query_Table,
+	// Поля ниже — «окружение текущей системы»: run заполняет их перед
+	// каждым вызовом системы и они валидны только внутри этого вызова.
+	query:   ^ecs.Query,        // первичный запрос текущей системы
+	queries: ^ecs.Query_Table,  // read-таблица текущей системы (для ctx_query)
 }
 
+// ctx_query возвращает именованный read-запрос текущей системы.
+// Валиден только внутри update/render-системы (вне диспетчера queries == nil).
 ctx_query :: proc(ctx: ^Ctx($Data), name: string) -> Maybe(ecs.Query) {
+	assert(ctx != nil && ctx.queries != nil,
+		"ctx_query: вне вызова системы (init/cleanup?) — read-таблица не установлена")
 	return ecs.query_table_get(ctx.queries, name)
 }
 
@@ -28,7 +35,7 @@ UpdateSystem :: struct ($Data: typeid) {
 	reads:  []ecs.Query_Def,
 	query:  ecs.Query,
 	read_q: ecs.Query_Table,
-	update: proc(_: ^Ctx(Data), _: ^ecs.Query, _: f32),
+	update: proc(_: ^Ctx(Data), _: f32),
 }
 
 RenderSystem :: struct ($Data: typeid) {
@@ -37,7 +44,7 @@ RenderSystem :: struct ($Data: typeid) {
 	reads:  []ecs.Query_Def,
 	query:  ecs.Query,
 	read_q: ecs.Query_Table,
-	render: proc(_: ^Ctx(Data), _: ^ecs.Query),
+	render: proc(_: ^Ctx(Data)),
 }
 
 // CleanupSystem is the mirror of init: it runs once after the main loop
@@ -100,10 +107,12 @@ run :: proc(g: ^Game($Data), world: ^ecs.World) {
 		world.locked = true
 
 		for &s in g.update {
-			g.ctx.queries = &s.read_q // контекст = запросы текущей системы
-			ecs.query_reset(&s.query)
-			s.update(&g.ctx, &s.query, delta)
+			g.ctx.query = &s.query          // окружение текущей системы
+			g.ctx.queries = &s.read_q
+			ecs.query_reset(g.ctx.query)
+			s.update(&g.ctx, delta)
 		}
+		g.ctx.query = nil
 		g.ctx.queries = nil
 
 		// Граница фаз: применяем отложенную структуру (adds→removes→destroys).
@@ -111,10 +120,12 @@ run :: proc(g: ^Game($Data), world: ^ecs.World) {
 
 		rl.BeginDrawing()
 		for &s in g.render {
+			g.ctx.query = &s.query
 			g.ctx.queries = &s.read_q
-			ecs.query_reset(&s.query)
-			s.render(&g.ctx, &s.query)
+			ecs.query_reset(g.ctx.query)
+			s.render(&g.ctx)
 		}
+		g.ctx.query = nil
 		g.ctx.queries = nil
 		rl.EndDrawing()
 

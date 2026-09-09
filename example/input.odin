@@ -5,8 +5,8 @@ import "../ecs"
 import rl "vendor:raylib"
 
 
-input_system :: proc(ctx: ^g.Ctx(Data), q: ^ecs.Query, delta: f32) {
+input_system :: proc(ctx: ^g.Ctx(Data), delta: f32) {
 	if rl.IsKeyPressed(.I) {
-		show_ui = !show_ui
+		ctx.data.debug_ui = !ctx.data.debug_ui
 	}
 }

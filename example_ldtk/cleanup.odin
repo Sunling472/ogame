@@ -32,7 +32,7 @@ cleanup_system :: proc(ctx: ^g.Ctx(Data)) {
 }
 
 // hud_render рисует жизнь/патроны игрока (стек-буфер, без аллокаций в кадр).
-hud_render :: proc(ctx: ^g.Ctx(Data), q: ^ecs.Query) {
+hud_render :: proc(ctx: ^g.Ctx(Data)) {
 	if !scene_ready(ctx) do return
 
 	// читаем read-запрос игрока (кешируется фреймворком)

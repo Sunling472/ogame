@@ -20,24 +20,24 @@ enemy_spawn :: proc(ctx: ^g.Ctx(Data), pos: [2]f32) {
 	ecs.cmds_add(ctx.cmds, e, comp.Color(rl.GREEN))
 }
 
-enemy_update :: proc(ctx: ^g.Ctx(Data), q: ^ecs.Query, delta: f32) {
+enemy_update :: proc(ctx: ^g.Ctx(Data), delta: f32) {
 	enemy_x: f32 = rand.float32_range(10, f32(rl.GetScreenWidth())  - 30)
 	enemy_y: f32 = rand.float32_range(10, f32(rl.GetScreenHeight()) - 30)
 
 	move_enemy_acc += delta
-	if _, ok := ecs.query_first(q).?; !ok {
+	if _, ok := ecs.query_first(ctx.query).?; !ok {
 		enemy_spawn(ctx, [2]f32{enemy_x, enemy_y})
 	} 
 }
 
-enemy_move :: proc(ctx: ^g.Ctx(Data), q: ^ecs.Query, delta: f32) {
+enemy_move :: proc(ctx: ^g.Ctx(Data), delta: f32) {
 	pq := g.ctx_query(ctx, "player").?
 	if player, ok := ecs.query_first(&pq).?; ok {
 		player_pos := ecs.query_get(&pq, player, comp.Pos).?
-		for ecs.query_next(q) {
-			enemy := q.entity
-			pos   := ecs.query_get(q, enemy, comp.Pos).?
-			speed := ecs.query_get(q, enemy, comp.Speed).?
+		for ecs.query_next(ctx.query) {
+			enemy := ctx.query.entity
+			pos   := ecs.query_get(ctx.query, enemy, comp.Pos).?
+			speed := ecs.query_get(ctx.query, enemy, comp.Speed).?
 			
 			enemy_direct: [2]f32
 			enemy_direct.x = player_pos.x - pos.x
@@ -52,11 +52,11 @@ enemy_move :: proc(ctx: ^g.Ctx(Data), q: ^ecs.Query, delta: f32) {
 	}
 }
 
-enemy_render :: proc(ctx: ^g.Ctx(Data), q: ^ecs.Query) {
-	if enemy, ok := ecs.query_first(q).?; ok {
-		pos   := ecs.query_get(q, enemy, comp.Pos).?
-		size  := ecs.query_get(q, enemy, comp.Size).?
-		color := ecs.query_get(q, enemy, comp.Color).?
+enemy_render :: proc(ctx: ^g.Ctx(Data)) {
+	if enemy, ok := ecs.query_first(ctx.query).?; ok {
+		pos   := ecs.query_get(ctx.query, enemy, comp.Pos).?
+		size  := ecs.query_get(ctx.query, enemy, comp.Size).?
+		color := ecs.query_get(ctx.query, enemy, comp.Color).?
 
 		rl.DrawRectangle(
 			i32(pos.x),

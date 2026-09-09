@@ -6,10 +6,8 @@ import "../ecs"
 import rl "vendor:raylib"
 import comp "components"
 
-show_ui: bool
-
-ui_debug_render :: proc(ctx: ^g.Ctx(Data), q: ^ecs.Query) {
-	if !show_ui do return
+ui_debug_render :: proc(ctx: ^g.Ctx(Data)) {
+	if !ctx.data.debug_ui do return
 
 	// закешированный фреймворком запрос — без построения на каждый тик
 	pq, ok := g.ctx_query(ctx, "player").?

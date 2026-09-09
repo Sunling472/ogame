@@ -121,31 +121,34 @@ do_interact :: proc(ctx: ^g.Ctx(Data), e: ecs.Entity, player: ecs.Entity) {
 
 // interact_system ищет ближайший интерактивный объект рядом с игроком,
 // показывает подсказку (в т.ч. какой ключ нужен) и обрабатывает клавишу E.
-interact_system :: proc(ctx: ^g.Ctx(Data), q: ^ecs.Query, delta: f32) {
+interact_system :: proc(ctx: ^g.Ctx(Data), delta: f32) {
 	ctx.data.hint_active = false
 	if !scene_ready(ctx) do return
+	
+	ok: bool
 
-	pq := g.ctx_query(ctx, "player")
-	if pq == nil do return
-	qv := pq.?
-
-	player, ok := ecs.query_first(&qv).?
+	pq: ecs.Query
+	pq, ok = g.ctx_query(ctx, "player").?
 	if !ok do return
 
-	ppos := ecs.query_get(&qv, player, Pos).?^
+	player: ecs.Entity
+	player, ok = ecs.query_first(&pq).?
+	if !ok do return
+
+	ppos := ecs.query_get(&pq, player, Pos).?^
 
 	best_entity: ecs.Entity
 	best_dist := max(f32)
 	best_pos: [2]f32
 
-	for ecs.query_next(q) {
-		it := ecs.query_get(q, q.entity, Interactable).?
-		x0, y0, x1, y1 := actor_rect(q, q.entity)
+	for ecs.query_next(ctx.query) {
+		it := ecs.query_get(ctx.query, ctx.query.entity, Interactable).?
+		x0, y0, x1, y1 := actor_rect(ctx.query, ctx.query.entity)
 
 		d := dist_to_rect(ppos.x, ppos.y, x0 - it.range, y0 - it.range, x1 + it.range, y1 + it.range)
 		if d < best_dist {
 			best_dist = d
-			best_entity = q.entity
+			best_entity = ctx.query.entity
 			best_pos = {(x0 + x1) / 2, y0}
 		}
 	}
@@ -174,7 +177,7 @@ interact_system :: proc(ctx: ^g.Ctx(Data), q: ^ecs.Query, delta: f32) {
 }
 
 // hint_render рисует подсказку над активным интерактивным объектом.
-hint_render :: proc(ctx: ^g.Ctx(Data), q: ^ecs.Query) {
+hint_render :: proc(ctx: ^g.Ctx(Data)) {
 	if !ctx.data.hint_active do return
 
 	rl.BeginMode2D(ctx.data.camera)

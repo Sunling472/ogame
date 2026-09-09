@@ -30,17 +30,17 @@ player_init :: proc(ctx: ^g.Ctx(Data)) {
 	)
 }
 
-player_update :: proc(ctx: ^g.Ctx(Data), q: ^ecs.Query, delta: f32) {
-	if player, ok := ecs.query_first(q).?; ok {
+player_update :: proc(ctx: ^g.Ctx(Data), delta: f32) {
+	if player, ok := ecs.query_first(ctx.query).?; ok {
 		// Во время игровой фазы пулы не двигаются: структуру меняют только
 		// через cmds_* (применяется cmds_flush после update). Поэтому
 		// указатели на компоненты стабильны, и можно писать сразу.
-		pos    := ecs.query_get(q, player, comp.Pos).?
-		vel    := ecs.query_get(q, player, comp.Vel).?
-		speed  := ecs.query_get(q, player, comp.Speed).?
-		side   := ecs.query_get(q, player, comp.Side).?
-		sprint := ecs.query_get(q, player, comp.Sprint).?
-		weapon := ecs.query_get(q, player, comp.Weapon).?
+		pos    := ecs.query_get(ctx.query, player, comp.Pos).?
+		vel    := ecs.query_get(ctx.query, player, comp.Vel).?
+		speed  := ecs.query_get(ctx.query, player, comp.Speed).?
+		side   := ecs.query_get(ctx.query, player, comp.Side).?
+		sprint := ecs.query_get(ctx.query, player, comp.Sprint).?
+		weapon := ecs.query_get(ctx.query, player, comp.Weapon).?
 
 		vel^ = comp.Vel{}
 
@@ -91,11 +91,11 @@ player_update :: proc(ctx: ^g.Ctx(Data), q: ^ecs.Query, delta: f32) {
 
 }
 
-player_render :: proc(ctx: ^g.Ctx(Data), q: ^ecs.Query) {
-	player := ecs.query_first(q).?
-	pos := ecs.query_get(q, player, comp.Pos).?
-	size := ecs.query_get(q, player, comp.Size).?
-	color := ecs.query_get(q, player, comp.Color).?
+player_render :: proc(ctx: ^g.Ctx(Data)) {
+	player := ecs.query_first(ctx.query).?
+	pos := ecs.query_get(ctx.query, player, comp.Pos).?
+	size := ecs.query_get(ctx.query, player, comp.Size).?
+	color := ecs.query_get(ctx.query, player, comp.Color).?
 
 	rl.DrawRectangle(i32(pos.x), i32(pos.y), size.x, size.y, rl.Color(color^))
 }

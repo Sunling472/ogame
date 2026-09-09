@@ -16,17 +16,17 @@ bullet_spawn :: proc(ctx: ^g.Ctx(Data), pos: [2]f32, side: comp.Side) {
 	ecs.cmds_add(ctx.cmds, b, comp.Side(side))
 }
 
-bullet_move :: proc(ctx: ^g.Ctx(Data), q: ^ecs.Query, delta: f32) {
+bullet_move :: proc(ctx: ^g.Ctx(Data), delta: f32) {
 	max_x := rl.GetScreenWidth()
 	max_y := rl.GetScreenHeight()
 	min_x := 0
 	min_y := 0
-	for ecs.query_next(q) {
-		e     := q.entity
-		pos   := ecs.query_get(q, e, comp.Pos).?
-		speed := ecs.query_get(q, e, comp.Speed).?
-		side  := ecs.query_get(q, e, comp.Side).?
-		size  := ecs.query_get(q, e, comp.Size).?
+	for ecs.query_next(ctx.query) {
+		e     := ctx.query.entity
+		pos   := ecs.query_get(ctx.query, e, comp.Pos).?
+		speed := ecs.query_get(ctx.query, e, comp.Speed).?
+		side  := ecs.query_get(ctx.query, e, comp.Side).?
+		size  := ecs.query_get(ctx.query, e, comp.Size).?
 
 		vel2: [2]f32
 		switch side^ {
@@ -52,12 +52,12 @@ bullet_move :: proc(ctx: ^g.Ctx(Data), q: ^ecs.Query, delta: f32) {
 	}
 }
 
-bullet_render :: proc(ctx: ^g.Ctx(Data), q: ^ecs.Query) {
-	for ecs.query_next(q) {
-		e := q.entity
-		p := ecs.query_get(q, e, comp.Pos).?
-		s := ecs.query_get(q, e, comp.Size).?
-		c := ecs.query_get(q, e, comp.Color).?
+bullet_render :: proc(ctx: ^g.Ctx(Data)) {
+	for ecs.query_next(ctx.query) {
+		e := ctx.query.entity
+		p := ecs.query_get(ctx.query, e, comp.Pos).?
+		s := ecs.query_get(ctx.query, e, comp.Size).?
+		c := ecs.query_get(ctx.query, e, comp.Color).?
 
 		rl.DrawRectangle(
 			i32(p.x),

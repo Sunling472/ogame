@@ -6,7 +6,9 @@ import vmem "core:mem/virtual"
 import g "../"
 import ecs "../ecs"
 
-Data :: struct {}
+Data :: struct {
+	debug_ui: bool
+}
 
 init :: proc(ctx: ^g.Ctx(Data)) {
 	player_init(ctx)

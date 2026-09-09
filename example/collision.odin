@@ -6,14 +6,14 @@ import rl "vendor:raylib"
 import comp "components"
 
 
-bullet_collision :: proc(ctx: ^g.Ctx(Data), q: ^ecs.Query, delta: f32) {
+bullet_collision :: proc(ctx: ^g.Ctx(Data), delta: f32) {
 	eq, ok := g.ctx_query(ctx, "enemies").?
 	if !ok do return
 
-	for ecs.query_next(q) {
-		bullet := q.entity
-		b_pos  := ecs.query_get(q, bullet, comp.Pos).?
-		b_size := ecs.query_get(q, bullet, comp.Size).?
+	for ecs.query_next(ctx.query) {
+		bullet := ctx.query.entity
+		b_pos  := ecs.query_get(ctx.query, bullet, comp.Pos).?
+		b_size := ecs.query_get(ctx.query, bullet, comp.Size).?
 
 		r1 := rl.Rectangle {
 			f32(b_pos.x),
@@ -44,17 +44,17 @@ bullet_collision :: proc(ctx: ^g.Ctx(Data), q: ^ecs.Query, delta: f32) {
 	}
 }
 
-player_border_collision :: proc(ctx: ^g.Ctx(Data), q: ^ecs.Query, delta: f32) {
+player_border_collision :: proc(ctx: ^g.Ctx(Data), delta: f32) {
 	min_x: f32 = 0
 	min_y: f32 = 0
 	max_x: f32 = f32(rl.GetScreenWidth())
 	max_y: f32 = f32(rl.GetScreenHeight())
 
-	if player, ok := ecs.query_first(q).?; ok {
-		pos   := ecs.query_get(q, player, comp.Pos).?
-		size  := ecs.query_get(q, player, comp.Size).?
-		speed := ecs.query_get(q, player, comp.Speed).?
-		vel   := ecs.query_get(q, player, comp.Vel).?
+	if player, ok := ecs.query_first(ctx.query).?; ok {
+		pos   := ecs.query_get(ctx.query, player, comp.Pos).?
+		size  := ecs.query_get(ctx.query, player, comp.Size).?
+		speed := ecs.query_get(ctx.query, player, comp.Speed).?
+		vel   := ecs.query_get(ctx.query, player, comp.Vel).?
 
 		left   := pos.x
 		right  := pos.x + f32(size.x)

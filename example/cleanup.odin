@@ -55,9 +55,9 @@ cleanup_system :: proc(ctx: ^g.Ctx(Data)) {
 
 	// (c) Если бы компоненты содержали строки/слайсы, которыми владеет игра:
 	//     мир здесь ещё жив, поэтому их можно обойти запросом и освободить:
-	//     q := ecs.query_new(ctx.world, {comp.TEnemy, comp.Name})
-	//     for ecs.query_next(&q) {
-	//         name := ecs.query_get(&q, q.entity, comp.Name).?
+	//     ctx.query := ecs.query_new(ctx.world, {comp.TEnemy, comp.Name})
+	//     for ecs.query_next(&ctx.query) {
+	//         name := ecs.query_get(&ctx.query, ctx.query.entity, comp.Name).?
 	//         delete(name^, context.allocator)
 	//     }
 	//     (world_destroy освободит слот пула, но не содержимое name — о нём

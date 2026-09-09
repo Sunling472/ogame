@@ -51,7 +51,7 @@ move_resolved :: proc(ctx: ^g.Ctx(Data), pos: ^[2]f32, v: [2]f32, half: [2]f32, 
 	}
 }
 
-player_update :: proc(ctx: ^g.Ctx(Data), q: ^ecs.Query, delta: f32) {
+player_update :: proc(ctx: ^g.Ctx(Data), delta: f32) {
 	if !scene_ready(ctx) do return
 
 	// read-запрос закрытых/открытых дверей (кешируется фреймворком)
@@ -62,10 +62,10 @@ player_update :: proc(ctx: ^g.Ctx(Data), q: ^ecs.Query, delta: f32) {
 		has_doors = true
 	}
 
-	if player, ok := ecs.query_first(q).?; ok {
-		pos := ecs.query_get(q, player, Pos).?
-		vel := ecs.query_get(q, player, Vel).?
-		speed := ecs.query_get(q, player, Speed).?
+	if player, ok := ecs.query_first(ctx.query).?; ok {
+		pos := ecs.query_get(ctx.query, player, Pos).?
+		vel := ecs.query_get(ctx.query, player, Vel).?
+		speed := ecs.query_get(ctx.query, player, Speed).?
 		f32_speed := f32(speed^)
 
 		// активный уровень = тот, где сейчас игрок (для сетки коллизий)

@@ -295,7 +295,7 @@ cam_axis_target :: proc(follow, min_x, max_x, view_half: f32) -> f32 {
 }
 
 // level_render рисует тайловые слои ВСЕХ уровней мира (атлас uid 1) под камерой.
-level_render :: proc(ctx: ^g.Ctx(Data), q: ^ecs.Query) {
+level_render :: proc(ctx: ^g.Ctx(Data)) {
 	rl.ClearBackground({14, 17, 26, 255})
 	if !scene_ready(ctx) do return
 
@@ -432,21 +432,21 @@ draw_actor_icon :: proc(tl: [2]f32, size: Size, kind: Actor_Kind, col: rl.Color,
 }
 
 // actors_render рисует сущности уровня по категориям (акторные «иконки»).
-actors_render :: proc(ctx: ^g.Ctx(Data), q: ^ecs.Query) {
+actors_render :: proc(ctx: ^g.Ctx(Data)) {
 	if !scene_ready(ctx) do return
 
 	rl.BeginMode2D(ctx.data.camera)
 	defer rl.EndMode2D()
 
-	for ecs.query_next(q) {
-		e      := q.entity
-		anchor := ecs.query_get(q, e, Pos).?^
-		size   := ecs.query_get(q, e, Size).?^
-		pivot  := ecs.query_get(q, e, Pivot).?^
-		col    := ecs.query_get(q, e, Col).?^
+	for ecs.query_next(ctx.query) {
+		e      := ctx.query.entity
+		anchor := ecs.query_get(ctx.query, e, Pos).?^
+		size   := ecs.query_get(ctx.query, e, Size).?^
+		pivot  := ecs.query_get(ctx.query, e, Pivot).?^
+		col    := ecs.query_get(ctx.query, e, Col).?^
 
 		kind := Actor_Kind.None
-		if k := ecs.query_get(q, e, Actor_Kind); k != nil {
+		if k := ecs.query_get(ctx.query, e, Actor_Kind); k != nil {
 			pk := k.?
 			kind = pk^
 		}
