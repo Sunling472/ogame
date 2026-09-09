@@ -8,6 +8,7 @@ import ecs "../ecs"
 
 init :: proc(ctx: ^g.Ctx) {
 	player_init(ctx)
+	resources_init(ctx) // грузим ресурсы игры — их же освободит cleanup
 }
 
 
