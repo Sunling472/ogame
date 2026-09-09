@@ -1,4 +1,4 @@
-package ecs2
+package ecs
 
 @(private)
 _stride_of :: proc(size, align: int) -> int {

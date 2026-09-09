@@ -1,4 +1,4 @@
-package ecs2
+package ecs
 
 MAX_QUERY_TYPES :: 16
 
