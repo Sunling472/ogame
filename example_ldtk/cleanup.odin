@@ -9,15 +9,15 @@ import rl "vendor:raylib"
 // Очистка ресурсов, которыми владеет демо (см. example/cleanup.odin о трёх
 // категориях владения). Текстуры raylib нужно выгружать, пока окно живо —
 // cleanup выполняется в run до defers CloseWindow.
-cleanup_system :: proc(ctx: ^g.Ctx) {
+cleanup_system :: proc(ctx: ^g.Ctx(Data)) {
 	// (a) raylib-текстуры (GPU-память, вне Odin-аллокаторов)
-	for uid in g_texture_uids {
-		if tex, ok := g_textures[uid]; ok {
+	for uid in ctx.data.texture_uids {
+		if tex, ok := ctx.data.textures[uid]; ok {
 			rl.UnloadTexture(tex)
 		}
 	}
-	delete(g_textures)
-	clear(&g_texture_uids)
+	delete(ctx.data.textures)
+	clear(&ctx.data.texture_uids)
 
 	// (b) данные, которыми владеет демо внутри компонентов: массивы ссылок
 	//     кнопок (Button_Link.targets) — мир хранит только заголовок и не знает
@@ -32,8 +32,8 @@ cleanup_system :: proc(ctx: ^g.Ctx) {
 }
 
 // hud_render рисует жизнь/патроны игрока (стек-буфер, без аллокаций в кадр).
-hud_render :: proc(ctx: ^g.Ctx, q: ^ecs.Query) {
-	if !scene_ready() do return
+hud_render :: proc(ctx: ^g.Ctx(Data), q: ^ecs.Query) {
+	if !scene_ready(ctx) do return
 
 	// читаем read-запрос игрока (кешируется фреймворком)
 	if pq := g.ctx_query(ctx, "player"); pq != nil {

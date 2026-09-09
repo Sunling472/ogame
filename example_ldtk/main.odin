@@ -4,6 +4,28 @@ import "core:log"
 import g "../"
 import ecs "../ecs"
 import ldtk "../ldtk"
+import rl "vendor:raylib"
+
+// Игровое состояние демо — живёт в ctx.data (вместо глобалов).
+Data :: struct {
+	project:       ldtk.Project,
+	levels:        []ldtk.Level,
+	world_bounds:  struct { min_x, min_y, max_x, max_y: f32 },
+	cur_level:     ^ldtk.Level,
+	cur_coll:      ^ldtk.Layer_Instance,
+	ready:         bool,
+
+	textures:      map[i32]rl.Texture2D,
+	texture_uids:  [dynamic]i32,
+	tileset_grid:  i32,
+
+	camera:        rl.Camera2D,
+	cam_follow:    [2]f32,
+
+	hint_active:   bool,
+	hint_pos:      [2]f32,
+	hint_kind:     Hint_Kind,
+}
 
 main :: proc() {
 	context.logger = log.create_console_logger()
@@ -11,7 +33,8 @@ main :: proc() {
 	world := ecs.world_new()
 	defer ecs.world_destroy(&world)
 
-	game: g.Game
+	game: g.Game(Data)
+
 	game.settings = {
 		window = {
 			title = "ogame + ldtk demo",
@@ -72,7 +95,7 @@ main :: proc() {
 
 	// данные уровня принадлежат демо (не миру): освобождаем после run,
 	// когда текстуры уже выгружены в cleanup.
-	if g_ready {
-		ldtk.project_destroy(&g_project)
+	if game.ctx.data.ready {
+		ldtk.project_destroy(&game.ctx.data.project)
 	}
 }

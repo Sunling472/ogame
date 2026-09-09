@@ -24,8 +24,8 @@ actor_rect :: proc(q: ^ecs.Query, e: ecs.Entity) -> (x0, y0, x1, y1: f32) {
 
 // solid_at_rect: пересекает ли прямоугольник что-то твёрдое — клетки IntGrid
 // или ЗАКРЫТУЮ дверь. doors может быть nil (тогда только сетка).
-solid_at_rect :: proc(x0, y0, x1, y1: f32, doors: ^ecs.Query) -> bool {
-	if rect_touches_grid(x0, y0, x1, y1) do return true
+solid_at_rect :: proc(ctx: ^g.Ctx(Data), x0, y0, x1, y1: f32, doors: ^ecs.Query) -> bool {
+	if rect_touches_grid(ctx, x0, y0, x1, y1) do return true
 	if doors == nil do return false
 
 	ecs.query_reset(doors)
@@ -50,11 +50,6 @@ Hint_Kind :: enum {
 	Need_KeyB, // дверь заперта на KeyB
 }
 
-// состояние подсказки на текущий кадр (обновляет interact_system,
-// рисует hint_render)
-g_hint_active: bool
-g_hint_pos:    [2]f32
-g_hint_kind:   Hint_Kind
 
 // dist_to_rect: расстояние от точки до прямоугольника (0 — внутри).
 dist_to_rect :: proc(x, y: f32, x0, y0, x1, y1: f32) -> f32 {
@@ -74,7 +69,7 @@ has_key :: proc(inv: Inventory, lock: Item_Kind) -> bool {
 }
 
 // pickup применяет эффект предмета к игроку.
-pickup :: proc(ctx: ^g.Ctx, player: ecs.Entity, kind: Item_Kind) {
+pickup :: proc(ctx: ^g.Ctx(Data), player: ecs.Entity, kind: Item_Kind) {
 	inv := ecs.get_component(ctx.world, player, Inventory)
 	ps := ecs.get_component(ctx.world, player, Player_State)
 	if inv == nil || ps == nil do return
@@ -93,7 +88,7 @@ pickup :: proc(ctx: ^g.Ctx, player: ecs.Entity, kind: Item_Kind) {
 }
 
 // toggle_linked_doors переключает двери, связанные с кнопкой.
-toggle_linked_doors :: proc(ctx: ^g.Ctx, link: ^Button_Link) {
+toggle_linked_doors :: proc(ctx: ^g.Ctx(Data), link: ^Button_Link) {
 	for t in link.targets {
 		if ds := ecs.get_component(ctx.world, t, Door_State); ds != nil {
 			ds.open = !ds.open
@@ -102,7 +97,7 @@ toggle_linked_doors :: proc(ctx: ^g.Ctx, link: ^Button_Link) {
 }
 
 // do_interact выполняет взаимодействие с выбранным объектом.
-do_interact :: proc(ctx: ^g.Ctx, e: ecs.Entity, player: ecs.Entity) {
+do_interact :: proc(ctx: ^g.Ctx(Data), e: ecs.Entity, player: ecs.Entity) {
 	// дверь: если заперта — нужен ключ; иначе открыть/закрыть
 	if ds := ecs.get_component(ctx.world, e, Door_State); ds != nil {
 		inv := ecs.get_component(ctx.world, player, Inventory)
@@ -126,9 +121,9 @@ do_interact :: proc(ctx: ^g.Ctx, e: ecs.Entity, player: ecs.Entity) {
 
 // interact_system ищет ближайший интерактивный объект рядом с игроком,
 // показывает подсказку (в т.ч. какой ключ нужен) и обрабатывает клавишу E.
-interact_system :: proc(ctx: ^g.Ctx, q: ^ecs.Query, delta: f32) {
-	g_hint_active = false
-	if !scene_ready() do return
+interact_system :: proc(ctx: ^g.Ctx(Data), q: ^ecs.Query, delta: f32) {
+	ctx.data.hint_active = false
+	if !scene_ready(ctx) do return
 
 	pq := g.ctx_query(ctx, "player")
 	if pq == nil do return
@@ -159,16 +154,16 @@ interact_system :: proc(ctx: ^g.Ctx, q: ^ecs.Query, delta: f32) {
 		return // рядом никого нет
 	}
 
-	g_hint_active = true
-	g_hint_pos = best_pos
-	g_hint_kind = .E
+	ctx.data.hint_active = true
+	ctx.data.hint_pos = best_pos
+	ctx.data.hint_kind = .E
 
 	// замок: подсказываем, какого ключа не хватает
 	if ds := ecs.get_component(ctx.world, best_entity, Door_State); ds != nil {
 		if ds.lock != .None {
 			inv := ecs.get_component(ctx.world, player, Inventory)
 			if inv == nil || !has_key(inv^, ds.lock) {
-				g_hint_kind = ds.lock == .KeyA ? .Need_KeyA : .Need_KeyB
+				ctx.data.hint_kind = ds.lock == .KeyA ? .Need_KeyA : .Need_KeyB
 			}
 		}
 	}
@@ -179,18 +174,18 @@ interact_system :: proc(ctx: ^g.Ctx, q: ^ecs.Query, delta: f32) {
 }
 
 // hint_render рисует подсказку над активным интерактивным объектом.
-hint_render :: proc(ctx: ^g.Ctx, q: ^ecs.Query) {
-	if !g_hint_active do return
+hint_render :: proc(ctx: ^g.Ctx(Data), q: ^ecs.Query) {
+	if !ctx.data.hint_active do return
 
-	rl.BeginMode2D(g_camera)
+	rl.BeginMode2D(ctx.data.camera)
 	defer rl.EndMode2D()
 
 	text: cstring
 	col: rl.Color
-	switch g_hint_kind {
+	switch ctx.data.hint_kind {
 	case .E:         text = "E";        col = rl.RAYWHITE
 	case .Need_KeyA: text = "KEY A";    col = rl.RED
 	case .Need_KeyB: text = "KEY B";    col = rl.RED
 	}
-	rl.DrawText(text, i32(g_hint_pos.x) - 12, i32(g_hint_pos.y) - 20, 16, col)
+	rl.DrawText(text, i32(ctx.data.hint_pos.x) - 12, i32(ctx.data.hint_pos.y) - 20, 16, col)
 }

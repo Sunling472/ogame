@@ -13,24 +13,6 @@ import rl "vendor:raylib"
 PROJECT_PATH :: "ldtk/example/example.ldtk"
 LEVEL_DIR    :: "ldtk/example/"
 
-// Камера: мир рисуется в мировых координатах, масштаб задаёт zoom (2x).
-g_camera:     rl.Camera2D
-g_cam_follow: [2]f32 // куда камера плавно едет (позиция игрока)
-
-g_project: ldtk.Project
-g_levels:  []ldtk.Level  // все уровни проекта (слайс в g_project)
-g_world:   struct { min_x, min_y, max_x, max_y: f32 } // границы всего мира
-
-// активный уровень (тот, где сейчас игрок) — его IntGrid для коллизий
-g_cur_level: ^ldtk.Level
-g_cur_coll:  ^ldtk.Layer_Instance // слой "Collisions" активного уровня
-
-g_ready: bool
-
-g_textures:      map[i32]rl.Texture2D
-g_texture_uids:  [dynamic]i32
-g_tileset_grid:  i32 // grid_size тайлсета уровня (для рисования тайлов)
-
 hex_nibble :: proc(ch: byte) -> u8 {
 	switch {
 	case ch >= '0' && ch <= '9': return ch - '0'
@@ -70,45 +52,23 @@ top_left :: proc(anchor: [2]f32, pivot: Pivot, size: Size) -> [2]f32 {
 	return {anchor.x - pivot.x * size.w, anchor.y - pivot.y * size.h}
 }
 
-scene_ready :: proc() -> bool {
-	return g_ready && len(g_levels) > 0
+scene_ready :: proc(ctx: ^g.Ctx(Data)) -> bool {
+	return ctx.data.ready && len(ctx.data.levels) > 0
 }
 
-// _level_collisions: IntGrid-слой "Collisions" уровня.
-_level_collisions :: proc(lv: ^ldtk.Level) -> ^ldtk.Layer_Instance {
-	for &li in lv.layer_instances {
-		if li.identifier == "Collisions" {
-			return &li
+// _refresh_active_level: активный уровень по мировой точке (для сетки
+// коллизий) — через чистые хелперы пакета ldtk.
+_refresh_active_level :: proc(ctx: ^g.Ctx(Data), x, y: f32) {
+	if lv := ldtk.level_at_world_point(&ctx.data.project, int(x), int(y)); lv != nil {
+		ctx.data.cur_level = lv.?
+		ctx.data.cur_coll = nil
+		if cl := ldtk.layer_instance(ctx.data.cur_level, "Collisions"); cl != nil {
+			ctx.data.cur_coll = cl.?
 		}
 	}
-	return nil
 }
 
-// level_at_point: уровень, содержащий мировую точку (и его слой Collisions).
-level_at_point :: proc(x, y: f32) -> (lv: ^ldtk.Level, coll: ^ldtk.Layer_Instance) {
-	for &l in g_levels {
-		x0, y0 := f32(l.world_x), f32(l.world_y)
-		if x >= x0 && x < x0 + f32(l.px_wid) &&
-		   y >= y0 && y < y0 + f32(l.px_hei) {
-			return &l, _level_collisions(&l)
-		}
-	}
-	return nil, nil
-}
-
-_compute_world_bounds :: proc() {
-	g_world = {1e9, 1e9, -1e9, -1e9}
-	for &l in g_levels {
-		x0, y0 := f32(l.world_x), f32(l.world_y)
-		x1, y1 := x0 + f32(l.px_wid), y0 + f32(l.px_hei)
-		g_world.min_x = min(g_world.min_x, x0)
-		g_world.min_y = min(g_world.min_y, y0)
-		g_world.max_x = max(g_world.max_x, x1)
-		g_world.max_y = max(g_world.max_y, y1)
-	}
-}
-
-scene_init :: proc(ctx: ^g.Ctx) {
+scene_init :: proc(ctx: ^g.Ctx(Data)) {
 	project, err, rerr := ldtk.load_file(PROJECT_PATH)
 	if rerr != nil {
 		log.errorf("ldtk: не удалось прочитать %s: %v", PROJECT_PATH, rerr)
@@ -118,43 +78,46 @@ scene_init :: proc(ctx: ^g.Ctx) {
 		log.errorf("ldtk: ошибка парсинга %s: %v", PROJECT_PATH, err)
 		return
 	}
-	g_project = project
-	g_levels = g_project.levels
-	if len(g_levels) == 0 {
+	ctx.data.project = project
+	ctx.data.levels = ctx.data.project.levels
+	if len(ctx.data.levels) == 0 {
 		log.errorf("ldtk: в проекте нет уровней")
 		return
 	}
-	_compute_world_bounds()
+	// границы мира для камеры
+	mnx, mny, mxx, mxy, okb := ldtk.world_bounds(&ctx.data.project)
+	if !okb {
+		log.errorf("ldtk: не удалось вычислить границы мира")
+		return
+	}
+	ctx.data.world_bounds = {f32(mnx), f32(mny), f32(mxx), f32(mxy)}
 
-	g_textures     = make(map[i32]rl.Texture2D)
-	g_texture_uids = make([dynamic]i32, context.allocator)
+	ctx.data.textures     = make(map[i32]rl.Texture2D)
+	ctx.data.texture_uids = make([dynamic]i32, context.allocator)
 
-	_load_tile_textures()
+	_load_tile_textures(ctx)
 	_spawn_level_entities(ctx)
 
 	// стартовый активный уровень — по позиции игрока (камера уже на нём)
-	if lv, cl := level_at_point(g_cam_follow.x, g_cam_follow.y); lv != nil {
-		g_cur_level = lv
-		g_cur_coll = cl
-	}
+	_refresh_active_level(ctx, ctx.data.cam_follow.x, ctx.data.cam_follow.y)
 
-	g_ready = true
+	ctx.data.ready = true
 	log.infof(
 		"ldtk: мир загружен, уровней %d, границы (%.0f..%.0f, %.0f..%.0f)",
-		len(g_levels), g_world.min_x, g_world.max_x, g_world.min_y, g_world.max_y,
+		len(ctx.data.levels), ctx.data.world_bounds.min_x, ctx.data.world_bounds.max_x, ctx.data.world_bounds.min_y, ctx.data.world_bounds.max_y,
 	)
 }
 
-_load_tile_textures :: proc() {
-	for &lv in g_levels {
+_load_tile_textures :: proc(ctx: ^g.Ctx(Data)) {
+	for &lv in ctx.data.levels {
 		for &li in lv.layer_instances {
 			has_tiles := len(li.auto_layer_tiles) > 0 || len(li.grid_tiles) > 0
 			if !has_tiles || li.tileset_def_uid <= 0 do continue
 
 			uid := i32(li.tileset_def_uid)
-			if uid in g_textures do continue
+			if uid in ctx.data.textures do continue
 
-			ts_maybe := ldtk.tileset_by_uid(&g_project, li.tileset_def_uid)
+			ts_maybe := ldtk.tileset_by_uid(&ctx.data.project, li.tileset_def_uid)
 			if ts_maybe == nil do continue
 			ts := ts_maybe.?
 			if ts.rel_path == "" do continue // встроенные иконки (embed) — без файла
@@ -168,9 +131,9 @@ _load_tile_textures :: proc() {
 				log.errorf("не удалось загрузить тайлсет %s", path)
 				continue
 			}
-			g_textures[uid] = tex
-			append(&g_texture_uids, uid)
-			g_tileset_grid = i32(ts.tile_grid_size)
+			ctx.data.textures[uid] = tex
+			append(&ctx.data.texture_uids, uid)
+			ctx.data.tileset_grid = i32(ts.tile_grid_size)
 			log.infof("загружен атлас %s (%dx%d)", path, tex.width, tex.height)
 		}
 	}
@@ -178,11 +141,11 @@ _load_tile_textures :: proc() {
 
 // pass 1: спавним акторов ВСЕХ уровней (координаты — мировые), помечаем
 // двери/кнопки, запоминаем iid → Entity.
-_spawn_level_entities :: proc(ctx: ^g.Ctx) {
+_spawn_level_entities :: proc(ctx: ^g.Ctx(Data)) {
 	iid_map := make(map[string]ecs.Entity)
 	defer delete(iid_map)
 
-	for &lv in g_levels {
+	for &lv in ctx.data.levels {
 		ox, oy := f32(lv.world_x), f32(lv.world_y)
 
 		for &li in lv.layer_instances {
@@ -197,7 +160,7 @@ _spawn_level_entities :: proc(ctx: ^g.Ctx) {
 				if len(ei.pivot) >= 2 do px = [2]f64{ei.pivot[0], ei.pivot[1]}
 
 				color: rl.Color = {255, 255, 255, 255}
-				if def := ldtk.entity_def_by_uid(&g_project, ei.def_uid); def != nil {
+				if def := ldtk.entity_def_by_uid(&ctx.data.project, ei.def_uid); def != nil {
 					color = hex_color(def.?.color)
 				}
 
@@ -233,7 +196,7 @@ _spawn_level_entities :: proc(ctx: ^g.Ctx) {
 					ecs.add_component(ctx.world, ent, Player_State{life, ammo})
 					ecs.add_component(ctx.world, ent, Speed(130))
 					ecs.add_component(ctx.world, ent, Inventory{})
-					g_cam_follow = anchor // камера стартует на игроке
+					ctx.data.cam_follow = anchor // камера стартует на игроке
 					log.infof("игрок: life=%d ammo=%d", life, ammo)
 
 				case "Door":
@@ -278,7 +241,7 @@ _spawn_level_entities :: proc(ctx: ^g.Ctx) {
 	door_by_button := make(map[ecs.Entity]bool) // двери, у которых есть кнопка
 	defer delete(door_by_button)
 
-	for &lv in g_levels {
+	for &lv in ctx.data.levels {
 		for &li in lv.layer_instances {
 			if li.type != "Entities" do continue
 
@@ -332,33 +295,33 @@ cam_axis_target :: proc(follow, min_x, max_x, view_half: f32) -> f32 {
 }
 
 // level_render рисует тайловые слои ВСЕХ уровней мира (атлас uid 1) под камерой.
-level_render :: proc(ctx: ^g.Ctx, q: ^ecs.Query) {
+level_render :: proc(ctx: ^g.Ctx(Data), q: ^ecs.Query) {
 	rl.ClearBackground({14, 17, 26, 255})
-	if !scene_ready() do return
+	if !scene_ready(ctx) do return
 
 	// камера: zoom фиксирован, offset — центр экрана, target плавно следует за игроком
-	g_camera.zoom = 2
-	g_camera.offset = {
+	ctx.data.camera.zoom = 2
+	ctx.data.camera.offset = {
 		f32(rl.GetScreenWidth()) * 0.5,
 		f32(rl.GetScreenHeight()) * 0.5,
 	}
 
 	// полвида камеры в мировых единицах: (экран/2) / zoom
 	view_half := [2]f32{
-		f32(rl.GetScreenWidth()) * 0.5 / g_camera.zoom,
-		f32(rl.GetScreenHeight()) * 0.5 / g_camera.zoom,
+		f32(rl.GetScreenWidth()) * 0.5 / ctx.data.camera.zoom,
+		f32(rl.GetScreenHeight()) * 0.5 / ctx.data.camera.zoom,
 	}
 	// ограничиваем цель границами мира
-	g_camera.target.x = cam_axis_target(g_cam_follow.x, g_world.min_x, g_world.max_x, view_half.x)
-	g_camera.target.y = cam_axis_target(g_cam_follow.y, g_world.min_y, g_world.max_y, view_half.y)
+	ctx.data.camera.target.x = cam_axis_target(ctx.data.cam_follow.x, ctx.data.world_bounds.min_x, ctx.data.world_bounds.max_x, view_half.x)
+	ctx.data.camera.target.y = cam_axis_target(ctx.data.cam_follow.y, ctx.data.world_bounds.min_y, ctx.data.world_bounds.max_y, view_half.y)
 
-	rl.BeginMode2D(g_camera)
+	rl.BeginMode2D(ctx.data.camera)
 	defer rl.EndMode2D()
 
-	gs := g_tileset_grid
+	gs := ctx.data.tileset_grid
 	if gs <= 0 do gs = 16
 
-	for &lv in g_levels {
+	for &lv in ctx.data.levels {
 		ox, oy := f32(lv.world_x), f32(lv.world_y)
 
 		// фон уровня
@@ -368,7 +331,7 @@ level_render :: proc(ctx: ^g.Ctx, q: ^ecs.Query) {
 		for i := len(lv.layer_instances) - 1; i >= 0; i -= 1 {
 			li := &lv.layer_instances[i]
 			if li.type == "Entities" do continue
-			tex, have_tex := g_textures[i32(li.tileset_def_uid)]
+			tex, have_tex := ctx.data.textures[i32(li.tileset_def_uid)]
 			if !have_tex do continue
 
 			for &t in li.auto_layer_tiles do _draw_tile(tex, t, gs, ox, oy)
@@ -469,10 +432,10 @@ draw_actor_icon :: proc(tl: [2]f32, size: Size, kind: Actor_Kind, col: rl.Color,
 }
 
 // actors_render рисует сущности уровня по категориям (акторные «иконки»).
-actors_render :: proc(ctx: ^g.Ctx, q: ^ecs.Query) {
-	if !scene_ready() do return
+actors_render :: proc(ctx: ^g.Ctx(Data), q: ^ecs.Query) {
+	if !scene_ready(ctx) do return
 
-	rl.BeginMode2D(g_camera)
+	rl.BeginMode2D(ctx.data.camera)
 	defer rl.EndMode2D()
 
 	for ecs.query_next(q) {
