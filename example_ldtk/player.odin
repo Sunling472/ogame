@@ -6,24 +6,28 @@ import ecs "../ecs"
 import ldtk "../ldtk"
 import rl "vendor:raylib"
 
-// Игрок: ввод + движение с коллизиями по IntGrid "Collisions".
-
-PLAYER_SPEED :: f32(130)
-
+// Игрок: ввод + движение с коллизиями по IntGrid активного уровня.
 is_solid_cell :: proc(cx, cy: int) -> bool {
-	if g_collisions == nil do return false
-	v, ok := ldtk.int_grid_cell(g_collisions, cx, cy)
+	if g_cur_coll == nil do return false
+	v, ok := ldtk.int_grid_cell(g_cur_coll, cx, cy)
 	return ok && v != 0
 }
 
-// rect_touches_solid проверяет прямоугольник игрока (уже в level-координатах)
-// на пересечение с любыми твёрдыми клетками intGrid.
-rect_touches_solid :: proc(x0, y0, x1, y1: f32) -> bool {
-	gs := f32(g_collisions.grid_size)
-	min_cx := int(math.floor(x0 / gs))
-	max_cx := int(math.floor((x1 - 0.001) / gs))
-	min_cy := int(math.floor(y0 / gs))
-	max_cy := int(math.floor((y1 - 0.001) / gs))
+// rect_touches_grid проверяет прямоугольник в МИРОВЫХ координатах на
+// пересечение с любыми твёрдыми клетками intGrid активного уровня.
+rect_touches_grid :: proc(x0, y0, x1, y1: f32) -> bool {
+	if g_cur_level == nil || g_cur_coll == nil do return false
+
+	ox, oy := f32(g_cur_level.world_x), f32(g_cur_level.world_y)
+	gs := f32(g_cur_coll.grid_size)
+
+	lx0, ly0 := x0 - ox, y0 - oy
+	lx1, ly1 := x1 - ox, y1 - oy
+
+	min_cx := int(math.floor(lx0 / gs))
+	max_cx := int(math.floor((lx1 - 0.001) / gs))
+	min_cy := int(math.floor(ly0 / gs))
+	max_cy := int(math.floor((ly1 - 0.001) / gs))
 	for cy in min_cy ..= max_cy {
 		for cx in min_cx ..= max_cx {
 			if is_solid_cell(cx, cy) do return true
@@ -33,15 +37,16 @@ rect_touches_solid :: proc(x0, y0, x1, y1: f32) -> bool {
 }
 
 // move_resolved двигает позицию-центр с разрешением коллизий по осям.
-move_resolved :: proc(pos: ^[2]f32, v: [2]f32, half: [2]f32) {
+// doors — read-запрос дверей (nil = только intGrid): закрытые двери блокируют.
+move_resolved :: proc(pos: ^[2]f32, v: [2]f32, half: [2]f32, doors: ^ecs.Query) {
 	// ось X
 	pos.x += v.x
-	if rect_touches_solid(pos.x - half.x, pos.y - half.y, pos.x + half.x, pos.y + half.y) {
+	if solid_at_rect(pos.x - half.x, pos.y - half.y, pos.x + half.x, pos.y + half.y, doors) {
 		pos.x -= v.x
 	}
 	// ось Y
 	pos.y += v.y
-	if rect_touches_solid(pos.x - half.x, pos.y - half.y, pos.x + half.x, pos.y + half.y) {
+	if solid_at_rect(pos.x - half.x, pos.y - half.y, pos.x + half.x, pos.y + half.y, doors) {
 		pos.y -= v.y
 	}
 }
@@ -49,24 +54,46 @@ move_resolved :: proc(pos: ^[2]f32, v: [2]f32, half: [2]f32) {
 player_update :: proc(ctx: ^g.Ctx, q: ^ecs.Query, delta: f32) {
 	if !scene_ready() do return
 
+	// read-запрос закрытых/открытых дверей (кешируется фреймворком)
+	door_q: ecs.Query
+	has_doors := false
+	if dq := g.ctx_query(ctx, "doors"); dq != nil {
+		door_q = dq.?
+		has_doors = true
+	}
+
 	if player, ok := ecs.query_first(q).?; ok {
 		pos := ecs.query_get(q, player, Pos).?
 		vel := ecs.query_get(q, player, Vel).?
+		speed := ecs.query_get(q, player, Speed).?
+		f32_speed := f32(speed^)
+
+		// активный уровень = тот, где сейчас игрок (для сетки коллизий)
+		if lv, cl := level_at_point(pos.x, pos.y); lv != nil {
+			g_cur_level = lv
+			g_cur_coll = cl
+		}
 
 		vel^ = {}
-		if rl.IsKeyDown(.W) || rl.IsKeyDown(.UP)    do vel.y -= PLAYER_SPEED
-		if rl.IsKeyDown(.S) || rl.IsKeyDown(.DOWN)  do vel.y += PLAYER_SPEED
-		if rl.IsKeyDown(.A) || rl.IsKeyDown(.LEFT)  do vel.x -= PLAYER_SPEED
-		if rl.IsKeyDown(.D) || rl.IsKeyDown(.RIGHT) do vel.x += PLAYER_SPEED
+		if rl.IsKeyDown(.W) || rl.IsKeyDown(.UP)    do vel.y -= f32_speed
+		if rl.IsKeyDown(.S) || rl.IsKeyDown(.DOWN)  do vel.y += f32_speed
+		if rl.IsKeyDown(.A) || rl.IsKeyDown(.LEFT)  do vel.x -= f32_speed
+		if rl.IsKeyDown(.D) || rl.IsKeyDown(.RIGHT) do vel.x += f32_speed
 
 		if vel.x != 0 && vel.y != 0 { // нормализуем диагональ
 			v := [2]f32{vel.x, vel.y}
 			len := math.sqrt(v.x * v.x + v.y * v.y)
-			vel.x = v.x / len * PLAYER_SPEED
-			vel.y = v.y / len * PLAYER_SPEED
+			vel.x = v.x / len * f32_speed
+			vel.y = v.y / len * f32_speed
 		}
 
 		// игрок 16x16; коллайдер чуть меньше, чтобы не лип к углам
-		move_resolved((^[2]f32)(pos), [2]f32{vel.x * delta, vel.y * delta}, {6, 6})
+		doors_arg := has_doors ? &door_q : nil
+		move_resolved((^[2]f32)(pos), [2]f32{vel.x * delta, vel.y * delta}, {6, 6}, doors_arg)
+
+		// камера плавно едет за игроком (кадр-независимый lerp)
+		k := clamp(10 * delta, 0, 1)
+		g_cam_follow.x += (pos.x - g_cam_follow.x) * k
+		g_cam_follow.y += (pos.y - g_cam_follow.y) * k
 	}
 }

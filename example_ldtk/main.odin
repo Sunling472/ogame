@@ -9,7 +9,7 @@ main :: proc() {
 	context.logger = log.create_console_logger()
 
 	world := ecs.world_new()
-	defer ecs.world_destroy(&world) // мир на heap — освобождаем после run
+	defer ecs.world_destroy(&world)
 
 	game: g.Game
 	game.settings = {
@@ -26,8 +26,19 @@ main :: proc() {
 	}
 	game.update = {
 		{
+			name   = "interact",
+			types  = {Interactable, Pos, Size, Pivot},
+			reads  = {
+				{name = "player", types = {TPlayer, Pos, Size}},
+			},
+			update = interact_system,
+		},
+		{
 			name   = "player",
-			types  = {TPlayer, Pos, Vel},
+			types  = {TPlayer, Pos, Vel, Speed},
+			reads  = {
+				{name = "doors", types = {TDoor, Door_State, Pos, Size, Pivot}},
+			},
 			update = player_update,
 		},
 	}
@@ -39,8 +50,13 @@ main :: proc() {
 		},
 		{
 			name   = "actors",
-			types  = {TActor, Pos, Size, Pivot, Col},
+			types  = {TActor, Pos, Size, Pivot, Col, Actor_Kind},
 			render = actors_render,
+		},
+		{
+			name   = "hint",
+			types  = {},
+			render = hint_render,
 		},
 		{
 			name   = "hud",

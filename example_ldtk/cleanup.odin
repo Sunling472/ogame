@@ -19,7 +19,16 @@ cleanup_system :: proc(ctx: ^g.Ctx) {
 	delete(g_textures)
 	clear(&g_texture_uids)
 
-	log.info("cleanup: атласы выгружены, мир жив")
+	// (b) данные, которыми владеет демо внутри компонентов: массивы ссылок
+	//     кнопок (Button_Link.targets) — мир хранит только заголовок и не знает
+	//     о содержимом, поэтому освобождаем сами, пока мир жив.
+	bq := ecs.query_new(ctx.world, {TButton, Button_Link})
+	for ecs.query_next(&bq) {
+		link := ecs.query_get(&bq, bq.entity, Button_Link).?
+		delete(link.targets)
+	}
+
+	log.info("cleanup: атласы и ссылки кнопок выгружены, мир жив")
 }
 
 // hud_render рисует жизнь/патроны игрока (стек-буфер, без аллокаций в кадр).
